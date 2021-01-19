@@ -6,6 +6,8 @@
 -- Load the wxLua module, does nothing if running from wxLua, wxLuaFreeze, or wxLuaEdit
 package.cpath = package.cpath..";./?.dll;./?.so;../bin/?.so;../lib/?.so;../lib/vc_dll/?.dll;../lib/bcc_dll/?.dll;../lib/mingw_dll/?.dll;"
 require("wx")
+http = require("http")
+json  = require("dkjson")
 
 UI = {}
 app = wx.wxGetApp()
@@ -27,6 +29,102 @@ if not wx.wxDirExists(images) then
   end
 end
 
+local camToImage = wx.wxFileName(currentWorkDirectory, "toimages.bat"):GetFullPath()
+if not isWindow then
+    camToImage = wx.wxFileName(currentWorkDirectory, "toimages.sh"):GetFullPath()
+end
+
+
+local screenToRstp = wx.wxFileName(currentWorkDirectory, "screen_to_tstp.bat"):GetFullPath()
+if not isWindow then
+    screenToRstp = wx.wxFileName(currentWorkDirectory, "screen_to_tstp.sh"):GetFullPath()
+end
+
+local connInfo = {
+    ["list"] = {{
+      ["id"] = 1,
+      ["name"] = "接入点11111",
+      ["auditDeviceId"]  = 1,
+      ["hostName"] = "主机1",
+      ["ip"] = "192.168.0.101",
+      ["mask"] = "255.255.255.0",
+      ["gateway"] = "192.168.0.1",
+      ["status"] = 1,
+      ["createTime"] = 1608246291000,
+    }},
+}
+
+function connectServer(url) 
+    local response = http.get(url)
+    if not response.isOk then
+        if not response.output or response.output == "" then
+            response.output = "参数不正确"
+        end
+        return false, response.output
+    end
+    local o, pos, err = json.decode(response.output)
+    if not o then
+        if not response.output then
+           response.output = "返回的数据不正确"
+        end
+        return false, response.output
+    end
+
+    connInfo = o
+    return true, nil
+end
+
+
+function getAccessPointID()
+    local txt = UI.m_endpoints:GetStringSelection()
+    if not txt or txt == "" then
+      return false, "请选择一个有效的接入点"
+    end
+   
+    for _, value in ipairs(connInfo["list"]) do
+        if value["name"] == txt then
+          return true, value["id"]
+        end
+    end
+   return false, txt
+end
+
+
+function sendLoginRequest()
+    local isOk, idOrMsg = getAccessPointID()
+    if not isOk then
+       return isOk, idOrMsg
+    end
+    local response = http.postWithFiles(UI.m_address:GetValue(),
+      {
+        name = UI.m_username:GetValue(),
+        accessPointId = idOrMsg,
+      },{
+        image = wx.wxFileName(images, imagefile):GetFullPath(),
+      })
+    if not response.isOk then
+        if not response.output or response.output == "" then
+            response.output = "参数不正确"
+        end
+        return false, response.output
+    end
+    
+    local o, pos, err = json.decode(response.output)
+    if not o then
+        if not response.output then
+            response.output = "返回的数据不正确"
+        end
+        return false, response.output
+    end
+    
+    if not o.id then       
+        return false, "响应中没有找到 id -- " .. response.output
+    end
+    return true, o.id
+end
+
+
+
 
 -- create ConnectDialog
 UI.ConnectDialog = wx.wxDialog (wx.NULL, wx.wxID_ANY, "连接到服务器...", wx.wxDefaultPosition, wx.wxSize( 438,101 ), wx.wxDEFAULT_DIALOG_STYLE )
@@ -35,17 +133,17 @@ UI.ConnectDialog = wx.wxDialog (wx.NULL, wx.wxID_ANY, "连接到服务器...", wx.wxDe
 	UI.bSizer1 = wx.wxBoxSizer( wx.wxVERTICAL )
 	
 	UI.m_addressChoices = {}
-	UI.m_address = wx.wxComboBox( UI.ConnectDialog, wx.wxID_ANY, "127.0.0.1:8000", wx.wxDefaultPosition, wx.wxDefaultSize, UI.m_addressChoices, 0 )
+	UI.m_address = wx.wxComboBox( UI.ConnectDialog, wx.wxID_ANY, "http://127.0.0.1:8000", wx.wxDefaultPosition, wx.wxDefaultSize, UI.m_addressChoices, 0 )
 	UI.bSizer1:Add( UI.m_address, 0, wx.wxALL + wx.wxEXPAND, 5 )
 	
-	UI.m_sdbSizer1 = wx.wxStdDialogButtonSizer()
-	UI.m_sdbSizer1OK = wx.wxButton( UI.ConnectDialog, wx.wxID_OK, "" )
-	UI.m_sdbSizer1:AddButton( UI.m_sdbSizer1OK )
-	UI.m_sdbSizer1Cancel = wx.wxButton( UI.ConnectDialog, wx.wxID_CANCEL, "" )
-	UI.m_sdbSizer1:AddButton( UI.m_sdbSizer1Cancel )
-	UI.m_sdbSizer1:Realize();
+	UI.m_connectbar = wx.wxStdDialogButtonSizer()
+	UI.m_connectbarOK = wx.wxButton( UI.ConnectDialog, wx.wxID_OK, "" )
+	UI.m_connectbar:AddButton( UI.m_connectbarOK )
+	UI.m_connectbarCancel = wx.wxButton( UI.ConnectDialog, wx.wxID_CANCEL, "" )
+	UI.m_connectbar:AddButton( UI.m_connectbarCancel )
+	UI.m_connectbar:Realize();
 	
-	UI.bSizer1:Add( UI.m_sdbSizer1, 0, wx.wxEXPAND, 5 )
+	UI.bSizer1:Add( UI.m_connectbar, 0, wx.wxEXPAND, 5 )
 	
 	
 	UI.ConnectDialog:SetSizer( UI.bSizer1 )
@@ -89,12 +187,12 @@ UI.LoginDialog = wx.wxDialog (wx.NULL, wx.wxID_ANY, "登录", wx.wxDefaultPosition
 	UI.m_endpoints = wx.wxListBox( UI.LoginDialog, wx.wxID_ANY, wx.wxDefaultPosition, wx.wxDefaultSize, UI.m_endpointsChoices, 0 )
 	UI.bSizer3:Add( UI.m_endpoints, 0, wx.wxALL + wx.wxEXPAND, 5 )
 	
-	UI.m_sdbSizer2 = wx.wxStdDialogButtonSizer()
-	UI.m_sdbSizer2OK = wx.wxButton( UI.LoginDialog, wx.wxID_OK, "" )
-	UI.m_sdbSizer2:AddButton( UI.m_sdbSizer2OK )
-	UI.m_sdbSizer2:Realize();
+	UI.m_loginbar = wx.wxStdDialogButtonSizer()
+	UI.m_loginbarOK = wx.wxButton( UI.LoginDialog, wx.wxID_OK, "" )
+	UI.m_loginbar:AddButton( UI.m_loginbarOK )
+	UI.m_loginbar:Realize();
 	
-	UI.bSizer3:Add( UI.m_sdbSizer2, 0, wx.wxEXPAND, 5 )
+	UI.bSizer3:Add( UI.m_loginbar, 0, wx.wxEXPAND, 5 )
 	
 	UI.m_staticText4 = wx.wxStaticText( UI.LoginDialog, wx.wxID_ANY, "\n  请对准摄像头，然后点确定。", wx.wxDefaultPosition, wx.wxDefaultSize, 0 )
 	UI.m_staticText4:Wrap( -1 )
@@ -107,6 +205,8 @@ UI.LoginDialog = wx.wxDialog (wx.NULL, wx.wxID_ANY, "登录", wx.wxDefaultPosition
 	UI.LoginDialog:SetSizer( UI.bSizer2 )
 	UI.LoginDialog:Layout()
 	UI.m_cam_timer = wx.wxTimer(UI.LoginDialog, wx.wxID_ANY)
+	
+	UI.m_poll_timer = wx.wxTimer(UI.LoginDialog, wx.wxID_ANY)
 	
 	
 	UI.LoginDialog:Centre( wx.wxBOTH )
@@ -122,26 +222,45 @@ UI.MainFrame = wx.wxDialog (wx.NULL, wx.wxID_ANY, "已登录正在录屏中...", wx.wxDe
 	
 	UI.mainSizer:Add( UI.m_bitmap2, 1, wx.wxALL + wx.wxEXPAND, 5 )
 	
-	UI.m_button2 = wx.wxButton( UI.MainFrame, wx.wxID_ANY, "断开", wx.wxDefaultPosition, wx.wxDefaultSize, 0 )
-	UI.mainSizer:Add( UI.m_button2, 0, wx.wxALL + wx.wxALIGN_CENTER_VERTICAL, 5 )
+	UI.m_screenbar = wx.wxStdDialogButtonSizer()
+	UI.m_screenbarOK = wx.wxButton( UI.MainFrame, wx.wxID_OK, "" )
+	UI.m_screenbar:AddButton( UI.m_screenbarOK )
+	UI.m_screenbarCancel = wx.wxButton( UI.MainFrame, wx.wxID_CANCEL, "" )
+	UI.m_screenbar:AddButton( UI.m_screenbarCancel )
+	UI.m_screenbar:Realize();
 	
-	UI.m_sdbSizer3 = wx.wxStdDialogButtonSizer()
-	UI.m_sdbSizer3OK = wx.wxButton( UI.MainFrame, wx.wxID_OK, "" )
-	UI.m_sdbSizer3:AddButton( UI.m_sdbSizer3OK )
-	UI.m_sdbSizer3:Realize();
-	
-	UI.mainSizer:Add( UI.m_sdbSizer3, 1, wx.wxEXPAND + wx.wxALIGN_CENTER_VERTICAL, 5 )
+	UI.mainSizer:Add( UI.m_screenbar, 1, wx.wxEXPAND + wx.wxALIGN_CENTER_VERTICAL, 5 )
 	
 	
 	UI.MainFrame:SetSizer( UI.mainSizer )
 	UI.MainFrame:Layout()
 	
 	UI.MainFrame:Centre( wx.wxBOTH )
+    
+    
 
+UI.m_connectbarOK:Connect( wx.wxEVT_COMMAND_BUTTON_CLICKED, function(event)   
+    local isOk, errMsg = connectServer(UI.m_address:GetValue())
+    if isOk then
+        event:Skip()
+        return
+    end
+   
+    wx.wxMessageBox(errMsg,
+                "连接服务器失败",
+                wx.wxOK + wx.wxICON_INFORMATION)
+                
+    
+    -- 下面一行测试用的
+    event:Skip()
+end)
+local result = UI.ConnectDialog:ShowModal()
+if result ~= wx.wxID_OK and result ~= wx.wxID_YES then
+    return
+end
 
 
 local isRunning = false
-
 UI.LoginDialog:Connect(wx.wxEVT_TIMER, function(event)
 --implements onTimer
     if isRunning then return end
@@ -154,14 +273,8 @@ UI.LoginDialog:Connect(wx.wxEVT_TIMER, function(event)
         isRunning = false
     end)
     
-    local toimage = wx.wxFileName(currentWorkDirectory, "toimages.bat"):GetFullPath()
-    if not isWindow then
-        toimage = wx.wxFileName(currentWorkDirectory, "toimages.sh"):GetFullPath()
-    end
     
-    local pid = wx.wxExecute(toimage, false, proc)
-    
-    
+    local pid = wx.wxExecute(camToImage, false, proc)
     if not pid or pid == -1 or pid == 0 then
         UI.m_cam_timer:Stop()
         
@@ -180,11 +293,29 @@ UI.LoginDialog:Connect(wx.wxEVT_TIMER, function(event)
     
 end )
 
-local result = UI.ConnectDialog:ShowModal()
-if result ~= wx.wxID_OK and result ~= wx.wxID_YES then
+UI.m_loginbarOK:Connect( wx.wxEVT_COMMAND_BUTTON_CLICKED, function(event)
+   UI.m_cam_timer:Stop()
+   
+   local isOk,errMsg = sendLoginRequest()
+   if isOk then
+    event:Skip()
     return
-end
+   end
+   
+    wx.wxMessageBox(errMsg,
+                "申请接入失败",
+                wx.wxOK + wx.wxICON_INFORMATION)
+   
+   UI.m_cam_timer:Start(100)
+end)
 
+print("=====begin")
+UI.m_endpoints:Clear()
+for _, value in ipairs(connInfo.list) do
+    print(value["name"])
+    UI.m_endpoints:Append(value["name"])
+end
+print("=====end")
 
 UI.m_cam_timer:Start(100)
 -- show the frame window
@@ -195,12 +326,38 @@ if result ~= wx.wxID_OK and result ~= wx.wxID_YES then
     return
 end
 
-local result = UI.MainFrame:ShowModal()
-if result ~= wx.wxID_OK and result ~= wx.wxID_YES then
-    wx.wxMessageBox('This is the "About" dialog of the MDI wxLua sample.\n'..
-                        wxlua.wxLUA_VERSION_STRING.." built with "..result,
-                        "About wxLua",
-                        wx.wxOK + wx.wxICON_INFORMATION,
-                        UI.MainFrame)
+
+
+local screenProc = wx.wxProcess()
+screenProc:Redirect()
+screenProc:Connect(wx.wxEVT_END_PROCESS, function(event) 
+  event:Skip()
+end)
+local screenPid = wx.wxExecute(screenToRstp, false, screenProc)
+if not screenPid or screenPid == -1 or screenPid == 0 then
+    wx.wxMessageBox(("Program unable to run as '%s'."):format(cmd),
+                "运行命令失败",
+                wx.wxOK + wx.wxICON_INFORMATION,
+                UI.LoginDialog)
+    return
 end
+
+local result = UI.MainFrame:ShowModal()
+
+local killResult = wx.wxProcess.Kill(screenPid)
+if killResult ~= wx.wxKILL_OK and killResult ~= wx.wxKILL_NO_PROCESS then
+    wx.wxMessageBox(("Program unable to run as '%s'."):format(killResult),
+                "停止命令失败",
+                wx.wxOK + wx.wxICON_INFORMATION,
+                UI.LoginDialog)
+    return
+end
+
+-- if result ~= wx.wxID_OK and result ~= wx.wxID_YES then
+--    wx.wxMessageBox('This is the "About" dialog of the MDI wxLua sample.\n'..
+--                        wxlua.wxLUA_VERSION_STRING.." built with "..result,
+--                        "About wxLua",
+--                        wx.wxOK + wx.wxICON_INFORMATION,
+--                        UI.MainFrame)
+-- end
 
