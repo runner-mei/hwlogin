@@ -119,7 +119,7 @@ function get(pa)
   return {
   isOk = true,
   status = statusCode,
-  output = output,
+  output = wx.wxString.FromUTF8(output),
   }
 end
 
@@ -228,4 +228,5 @@ return {
   get = get,
   post = post,
   postWithFiles = postWithFiles,
+  join = join,
 }

@@ -845,7 +845,7 @@
             </object>
             <object class="wxTimer" expanded="1">
                 <property name="enabled">0</property>
-                <property name="id">wxID_ANY</property>
+                <property name="id">wxID_CAM_TIMER</property>
                 <property name="name">m_cam_timer</property>
                 <property name="oneshot">0</property>
                 <property name="period">1000</property>
@@ -854,12 +854,12 @@
             </object>
             <object class="wxTimer" expanded="1">
                 <property name="enabled">0</property>
-                <property name="id">wxID_ANY</property>
+                <property name="id">wxID_POLL_TIMER</property>
                 <property name="name">m_poll_timer</property>
                 <property name="oneshot">0</property>
                 <property name="period">1000</property>
                 <property name="permission">protected</property>
-                <event name="OnTimer"></event>
+                <event name="OnTimer">aa</event>
             </object>
         </object>
         <object class="Dialog" expanded="1">
@@ -1016,7 +1016,7 @@
                     <property name="proportion">1</property>
                     <object class="wxStdDialogButtonSizer" expanded="1">
                         <property name="Apply">0</property>
-                        <property name="Cancel">1</property>
+                        <property name="Cancel">0</property>
                         <property name="ContextHelp">0</property>
                         <property name="Help">0</property>
                         <property name="No">0</property>

@@ -9,6 +9,18 @@ require("wx")
 http = require("http")
 json  = require("dkjson")
 
+
+local IDCounter = nil
+local function NewID()
+    if not IDCounter then IDCounter = wx.wxID_HIGHEST end
+    IDCounter = IDCounter + 1
+    return IDCounter
+end
+
+local wxID_CAM_TIMER =NewID()
+local wxID_POLL_TIMER = NewID()
+
+    
 UI = {}
 app = wx.wxGetApp()
 stdpaths = wx.wxStandardPaths.Get()
@@ -53,6 +65,7 @@ local connInfo = {
       ["createTime"] = 1608246291000,
     }},
 }
+local connID
 
 function connectServer(url) 
     local response = http.get(url)
@@ -95,7 +108,7 @@ function sendLoginRequest()
     if not isOk then
        return isOk, idOrMsg
     end
-    local response = http.postWithFiles(UI.m_address:GetValue(),
+    local response = http.postWithFiles(http.join(UI.m_address:GetValue(), "/api/link/apply"),
       {
         name = UI.m_username:GetValue(),
         accessPointId = idOrMsg,
@@ -120,10 +133,38 @@ function sendLoginRequest()
     if not o.id then       
         return false, "响应中没有找到 id -- " .. response.output
     end
-    return true, o.id
+    
+    connID = o.id
+    return true, nil
 end
 
 
+function pollLoginStatus()
+    if not connID then
+        return true, "fail", "参数不正确, session 为空"
+    end
+    local response = http.get(http.join(http.join(UI.m_address:GetValue(), "/api/link/"),connID))
+    if not response.isOk then
+        if not response.output or response.output == "" then
+            response.output = "参数不正确"
+        end
+        return false, nil, response.output
+    end
+    
+    local o, pos, err = json.decode(response.output)
+    if not o then
+        if not response.output then
+            response.output = "返回的数据不正确"
+        end
+        return false, nil, response.output
+    end
+    
+    if not o.status then       
+        return false, "响应中没有找到 status -- " .. response.output
+    end
+    
+    return true, o.status, o.msg
+end
 
 
 -- create ConnectDialog
@@ -204,9 +245,9 @@ UI.LoginDialog = wx.wxDialog (wx.NULL, wx.wxID_ANY, "登录", wx.wxDefaultPosition
 	
 	UI.LoginDialog:SetSizer( UI.bSizer2 )
 	UI.LoginDialog:Layout()
-	UI.m_cam_timer = wx.wxTimer(UI.LoginDialog, wx.wxID_ANY)
+	UI.m_cam_timer = wx.wxTimer(UI.LoginDialog, wxID_CAM_TIMER)
 	
-	UI.m_poll_timer = wx.wxTimer(UI.LoginDialog, wx.wxID_ANY)
+	UI.m_poll_timer = wx.wxTimer(UI.LoginDialog, wxID_POLL_TIMER)
 	
 	
 	UI.LoginDialog:Centre( wx.wxBOTH )
@@ -240,7 +281,7 @@ UI.MainFrame = wx.wxDialog (wx.NULL, wx.wxID_ANY, "已登录正在录屏中...", wx.wxDe
     
 
 UI.m_connectbarOK:Connect( wx.wxEVT_COMMAND_BUTTON_CLICKED, function(event)   
-    local isOk, errMsg = connectServer(UI.m_address:GetValue())
+    local isOk, errMsg = connectServer(http.join(UI.m_address:GetValue(), "/api/accessPointList"))
     if isOk then
         event:Skip()
         return
@@ -262,8 +303,35 @@ end
 
 local isRunning = false
 UI.LoginDialog:Connect(wx.wxEVT_TIMER, function(event)
---implements onTimer
-    if isRunning then return end
+    event:Skip()
+    
+    local eventID = event:GetId()
+    if eventID == wxID_POLL_TIMER then
+        local ok, status, msg = pollLoginStatus(id)
+        if not ok then
+            wx.wxMessageBox(msg,
+                msg,
+                wx.wxOK + wx.wxICON_INFORMATION)
+        elseif status == "pending" then
+            return
+        elseif status == "ok" then
+            if UI.LoginDialog:IsModal() then
+                UI.LoginDialog:EndModal(wx.wxID_OK)
+            end
+        elseif status == "fail" then
+            wx.wxMessageBox(msg,
+                msg,
+                wx.wxOK + wx.wxICON_INFORMATION)
+        end
+        UI.m_poll_timer:Stop()
+        UI.m_loginbarOK:Enable(true)
+        UI.m_loginbarOK:SetLabel("确定")
+        return
+    end
+
+    if isRunning then
+       return
+    end
     
     isRunning = true
     
@@ -290,23 +358,24 @@ UI.LoginDialog:Connect(wx.wxEVT_TIMER, function(event)
     local size = UI.m_cam_bitmap:GetSize()
     image = image:Rescale(size:GetWidth(), size:GetHeight())    
     UI.m_cam_bitmap:SetBitmap(wx.wxBitmap(image))
-    
-end )
+end)
 
 UI.m_loginbarOK:Connect( wx.wxEVT_COMMAND_BUTTON_CLICKED, function(event)
-   UI.m_cam_timer:Stop()
+    UI.m_cam_timer:Stop()
    
-   local isOk,errMsg = sendLoginRequest()
-   if isOk then
-    event:Skip()
-    return
-   end
+    local isOk,errMsg = sendLoginRequest()
+    if isOk then      
+      UI.m_loginbarOK:SetLabel("申请中...")
+      UI.m_loginbarOK:Disable()
+      UI.m_poll_timer:Start(5000)
+      return
+    end
    
     wx.wxMessageBox(errMsg,
                 "申请接入失败",
                 wx.wxOK + wx.wxICON_INFORMATION)
    
-   UI.m_cam_timer:Start(100)
+    UI.m_cam_timer:Start(100)
 end)
 
 print("=====begin")
@@ -344,13 +413,16 @@ end
 
 local result = UI.MainFrame:ShowModal()
 
-local killResult = wx.wxProcess.Kill(screenPid)
+local killResult = wx.wxKill(screenPid, wx.wxSIGINT)
 if killResult ~= wx.wxKILL_OK and killResult ~= wx.wxKILL_NO_PROCESS then
-    wx.wxMessageBox(("Program unable to run as '%s'."):format(killResult),
-                "停止命令失败",
-                wx.wxOK + wx.wxICON_INFORMATION,
-                UI.LoginDialog)
-    return
+    killResult = wx.wxKill(screenPid, wx.wxSIGKILL)
+    if killResult ~= wx.wxKILL_OK and killResult ~= wx.wxKILL_NO_PROCESS then
+        wx.wxMessageBox(("Program unable to run as '%s'."):format(killResult),
+                    "停止命令失败",
+                    wx.wxOK + wx.wxICON_INFORMATION,
+                    UI.LoginDialog)
+        return
+    end
 end
 
 -- if result ~= wx.wxID_OK and result ~= wx.wxID_YES then
