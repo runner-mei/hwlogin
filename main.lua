@@ -166,6 +166,20 @@ function pollLoginStatus()
     return true, o.status, o.msg
 end
 
+function disconnect()
+    if not connID then
+        return true, "fail", "参数不正确, session 为空"
+    end
+    local response = http.delete(http.join(http.join(UI.m_address:GetValue(), "/api/link/"),connID), "application/json", "{}")
+    if not response.isOk then
+        if not response.output or response.output == "" then
+            response.output = "参数不正确"
+        end
+        return false, response.output
+    end
+    
+    return true, nil
+end
 
 -- create ConnectDialog
 UI.ConnectDialog = wx.wxDialog (wx.NULL, wx.wxID_ANY, "连接到服务器...", wx.wxDefaultPosition, wx.wxSize( 438,101 ), wx.wxDEFAULT_DIALOG_STYLE )
@@ -266,8 +280,8 @@ UI.MainFrame = wx.wxDialog (wx.NULL, wx.wxID_ANY, "已登录正在录屏中...", wx.wxDe
 	UI.m_screenbar = wx.wxStdDialogButtonSizer()
 	UI.m_screenbarOK = wx.wxButton( UI.MainFrame, wx.wxID_OK, "" )
 	UI.m_screenbar:AddButton( UI.m_screenbarOK )
-	UI.m_screenbarCancel = wx.wxButton( UI.MainFrame, wx.wxID_CANCEL, "" )
-	UI.m_screenbar:AddButton( UI.m_screenbarCancel )
+	-- UI.m_screenbarCancel = wx.wxButton( UI.MainFrame, wx.wxID_CANCEL, "" )
+	-- UI.m_screenbar:AddButton( UI.m_screenbarCancel )
 	UI.m_screenbar:Realize();
 	
 	UI.mainSizer:Add( UI.m_screenbar, 1, wx.wxEXPAND + wx.wxALIGN_CENTER_VERTICAL, 5 )
@@ -290,10 +304,6 @@ UI.m_connectbarOK:Connect( wx.wxEVT_COMMAND_BUTTON_CLICKED, function(event)
     wx.wxMessageBox(errMsg,
                 "连接服务器失败",
                 wx.wxOK + wx.wxICON_INFORMATION)
-                
-    
-    -- 下面一行测试用的
-    event:Skip()
 end)
 local result = UI.ConnectDialog:ShowModal()
 if result ~= wx.wxID_OK and result ~= wx.wxID_YES then
@@ -318,7 +328,7 @@ UI.LoginDialog:Connect(wx.wxEVT_TIMER, function(event)
             if UI.LoginDialog:IsModal() then
                 UI.LoginDialog:EndModal(wx.wxID_OK)
             end
-        elseif status == "fail" then
+        elseif status == "fail" or status == "deny" then
             wx.wxMessageBox(msg,
                 msg,
                 wx.wxOK + wx.wxICON_INFORMATION)
@@ -412,6 +422,8 @@ if not screenPid or screenPid == -1 or screenPid == 0 then
 end
 
 local result = UI.MainFrame:ShowModal()
+
+disconnect()
 
 local killResult = wx.wxKill(screenPid, wx.wxSIGINT)
 if killResult ~= wx.wxKILL_OK and killResult ~= wx.wxKILL_NO_PROCESS then

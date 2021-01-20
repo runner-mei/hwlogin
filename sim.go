@@ -88,6 +88,30 @@ func index(w http.ResponseWriter, r *http.Request) {
 "status":1,
 "createTime":1608246305000,
 "auditDeviceName":null
+},
+{
+"id":3,
+"name":"fail",
+"auditDeviceId":1,
+"hostName":"主机22",
+"ip":"192.168.0.122",
+"mask":"255.255.255.0",
+"gateway":"192.168.0.1",
+"status":1,
+"createTime":1608246305000,
+"auditDeviceName":null
+}
+{
+"id":4,
+"name":"will_deny",
+"auditDeviceId":1,
+"hostName":"主机22",
+"ip":"192.168.0.122",
+"mask":"255.255.255.0",
+"gateway":"192.168.0.1",
+"status":1,
+"createTime":1608246305000,
+"auditDeviceName":null
 }
 ]
 }`)
@@ -103,7 +127,7 @@ type session struct {
 var sessions = map[string]session{}
 
 func apply(w http.ResponseWriter, r *http.Request) {
-	err := r.ParseForm()
+	err := r.ParseMultipartForm(1 * 1024 * 1024)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -118,7 +142,15 @@ func apply(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
+	if name == "" {
+		http.Error(w, `{"code": "bad_error", "msg": "申请接入发送失败, 用名为空"}`, http.StatusBadRequest)
+		return
+	}
+
 	if name == "fail" {
+		fmt.Println("name=", name)
+		fmt.Println("accessPoint=", accessPoint)
+
 		http.Error(w, `{"code": "bad_error", "msg": "申请接入发送失败"}`, http.StatusBadRequest)
 		return
 	}
@@ -167,7 +199,13 @@ func readStatus(w http.ResponseWriter, r *http.Request, id string) {
 	sess, ok := sessions[id]
 	if ok {
 		w.WriteHeader(http.StatusOK)
-		io.WriteString(w, `{"status": "`+sess.status+`", "msg": "申请接入成功"}`)
+		if sess.status == "deny" {
+			io.WriteString(w, `{"status": "`+sess.status+`", "msg": "申请接入失败"}`)
+		} else if sess.status == "fail" {
+			io.WriteString(w, `{"status": "`+sess.status+`", "msg": "申请接入失败"}`)
+		} else {
+			io.WriteString(w, `{"status": "`+sess.status+`", "msg": "申请接入成功"}`)
+		}
 		return
 	}
 

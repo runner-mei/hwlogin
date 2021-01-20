@@ -164,6 +164,7 @@ function concat(o, delm)
 end
 
 function doHttp(command)
+    print(command)
     local a, out, err = wx.wxExecuteStdoutStderr(command, wx.wxEXEC_SYNC)
     if not a or a ~= 0 then        
         return {
@@ -181,9 +182,8 @@ function doHttp(command)
     }
 end
 
-
 function postWithFiles(pa, body, files) 
-   local command = curl .. " -s -S "
+   local command = curl .. " -X POST -s -S "
    for k, v in pairs(body) do
      command = command .. " -F \"" .. k .. "=" .. string.gsub(v, "\"", "\\\"") .. "\" "
    end
@@ -196,7 +196,7 @@ function postWithFiles(pa, body, files)
 end
 
 function post(pa, contentType, body)
-  local command = curl .. " -s -S -H \"Content-Type: "..contentType .. "\""
+  local command = curl .. " -X POST -s -S -H \"Content-Type: "..contentType .. "\""
    
   if type(body) == "string" then
    command = command .. " -d \"" .. string.gsub(body, "\"", "\\\"") .. "\" "
@@ -211,6 +211,20 @@ function post(pa, contentType, body)
 end
 
 
+function delete(pa, contentType, body)
+  local command = curl .. " -X DELETE -s -S -H \"Content-Type: "..contentType .. "\""
+   
+  if type(body) == "string" then
+   command = command .. " -d \"" .. string.gsub(body, "\"", "\\\"") .. "\" "
+  else
+    for k, v in pairs(body) do
+      command = command .. " -F \"" .. k .. "=" .. string.gsub(v, "\"", "\\\"") .. "\" "
+    end
+  end
+   
+  command = command .. " " .. pa
+  return doHttp(command)
+end
 
 -- local response = get("http://127.0.0.1/hengwei/home")
 -- dump(response) 
@@ -228,5 +242,6 @@ return {
   get = get,
   post = post,
   postWithFiles = postWithFiles,
+  delete = delete,
   join = join,
 }

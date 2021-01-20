@@ -27,3 +27,4 @@ out/
 *.out
 tmp
 images/
+image-*.jpg
