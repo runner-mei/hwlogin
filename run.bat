@@ -1,2 +1,2 @@
 cd /d %~dp0
-start wxLua.exe main.lua
+start wxlua.exe main.lua

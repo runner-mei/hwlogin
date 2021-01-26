@@ -62,8 +62,9 @@ func main() {
 func index(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, `{
 "msg":"获得接入点列表成功",
-"request_poll_interval": 60,
+"request_poll_interval": 5,
 "request_timeout": 300,
+"media_server": "127.0.0.1",
 "list":[
 {
 "id":1,
@@ -100,7 +101,7 @@ func index(w http.ResponseWriter, r *http.Request) {
 "status":1,
 "createTime":1608246305000,
 "auditDeviceName":null
-}
+},
 {
 "id":4,
 "name":"will_deny",
@@ -173,7 +174,7 @@ func apply(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	io.WriteString(w, `{"id": "`+idStr+`", "msg": "申请接入已发送"}`)
-	fmt.Println("name=", name)
+	fmt.Println("name=", string(util.ToGB18030([]byte(name))))
 	fmt.Println("accessPoint=", accessPoint)
 	fmt.Println("image=", "image-"+idStr+".jpg")
 
@@ -186,7 +187,9 @@ func apply(w http.ResponseWriter, r *http.Request) {
 	if name == "will_deny" {
 		status = "deny"
 	}
-
+	if name == "pending_forever" {
+		return
+	}
 	time.AfterFunc(10*time.Second, func() {
 		sessions[idStr] = session{
 			name:   name,

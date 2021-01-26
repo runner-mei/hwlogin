@@ -4,10 +4,11 @@
 ----------------------------------------------------------------------------
 
 -- Load the wxLua module, does nothing if running from wxLua, wxLuaFreeze, or wxLuaEdit
-package.cpath = package.cpath..";./?.dll;./?.so;../bin/?.so;../lib/?.so;../lib/vc_dll/?.dll;../lib/bcc_dll/?.dll;../lib/mingw_dll/?.dll;"
+package.cpath = package.cpath..";./?.dll;./?.so;./clibs/?.dll;;./clibs/?.so;../bin/?.so;../lib/?.so;../lib/vc_dll/?.dll;../clibs/?.dll;../lib/bcc_dll/?.dll;../lib/mingw_dll/?.dll;"
 require("wx")
 http = require("http")
 json  = require("dkjson")
+utf8 = require("utf8")
 
 
 local IDCounter = nil
@@ -47,10 +48,24 @@ if not isWindow then
 end
 
 
-local screenToRstp = wx.wxFileName(currentWorkDirectory, "screen_to_tstp.bat"):GetFullPath()
+local screenToMediaServer = wx.wxFileName(currentWorkDirectory, "screenToMediaServer.bat"):GetFullPath()
 if not isWindow then
-    screenToRstp = wx.wxFileName(currentWorkDirectory, "screen_to_tstp.sh"):GetFullPath()
+    screenToMediaServer = wx.wxFileName(currentWorkDirectory, "screenToMediaServer.sh"):GetFullPath()
 end
+
+function readAll(file)
+    local f = io.open(file, "r")
+    local current = f:read("*a")
+    return current
+end
+
+print(screenToMediaServer)
+screenToMediaServer = readAll(screenToMediaServer)
+if screenToMediaServer == "" then
+   print("screenToMediaServer is empty")
+   return
+end
+print(screenToMediaServer)
 
 local connInfo = {
     ["list"] = {{
@@ -66,6 +81,16 @@ local connInfo = {
     }},
 }
 local connID
+local accessPointID
+
+function getCurrentAccessPoint() 
+    for _, value in ipairs(connInfo["list"]) do
+        if value["id"] == accessPointID then
+          return true, value
+        end
+    end
+   return false, nil
+end
 
 function connectServer(url) 
     local response = http.get(url)
@@ -73,6 +98,7 @@ function connectServer(url)
         if not response.output or response.output == "" then
             response.output = "参数不正确"
         end
+        print("1")
         return false, response.output
     end
     local o, pos, err = json.decode(response.output)
@@ -80,6 +106,10 @@ function connectServer(url)
         if not response.output then
            response.output = "返回的数据不正确"
         end
+        print("2")
+        print(pos)
+        print(err)
+        print(response.output)
         return false, response.output
     end
 
@@ -102,15 +132,15 @@ function getAccessPointID()
    return false, txt
 end
 
-
 function sendLoginRequest()
     local isOk, idOrMsg = getAccessPointID()
     if not isOk then
        return isOk, idOrMsg
     end
+    local username = UI.m_username:GetValue()
     local response = http.postWithFiles(http.join(UI.m_address:GetValue(), "/api/link/apply"),
       {
-        name = UI.m_username:GetValue(),
+        name = username,
         accessPointId = idOrMsg,
       },{
         image = wx.wxFileName(images, imagefile):GetFullPath(),
@@ -131,10 +161,12 @@ function sendLoginRequest()
     end
     
     if not o.id then       
+        print(response.output)
         return false, "响应中没有找到 id -- " .. response.output
     end
     
     connID = o.id
+    accessPointID = idOrMsg
     return true, nil
 end
 
@@ -289,6 +321,7 @@ UI.MainFrame = wx.wxDialog (wx.NULL, wx.wxID_ANY, "已登录正在录屏中...", wx.wxDe
 	
 	UI.MainFrame:SetSizer( UI.mainSizer )
 	UI.MainFrame:Layout()
+	UI.m_check_timer = wx.wxTimer(UI.MainFrame, wx.wxID_ANY)
 	
 	UI.MainFrame:Centre( wx.wxBOTH )
     
@@ -312,18 +345,48 @@ end
 
 
 local isRunning = false
+local startAt
 UI.LoginDialog:Connect(wx.wxEVT_TIMER, function(event)
     event:Skip()
     
     local eventID = event:GetId()
     if eventID == wxID_POLL_TIMER then
-        local ok, status, msg = pollLoginStatus(id)
+        local ok, status, msg = pollLoginStatus()
         if not ok then
             wx.wxMessageBox(msg,
                 msg,
                 wx.wxOK + wx.wxICON_INFORMATION)
         elseif status == "pending" then
-            return
+            local elapsed = os.difftime(os.time(), startAt)
+            local maxtimeout = 1 * 60
+            local reqValue = connInfo.request_timeout
+            
+            if not reqValue then
+                if type(reqValue) == "string" and reqValue ~= "" then
+                  reqValue = tonumber(reqValue)
+                  if reqValue> 0 then
+                    interval = reqValue * 1000
+                  end
+                elseif type(reqValue) == "number" and reqValue > 0 then
+                  interval = reqValue * 1000
+                end
+            end
+      
+            
+            print("elapsed="..elapsed .. ", timeout="..maxtimeout)
+            if elapsed > maxtimeout then
+                UI.m_poll_timer:Stop()
+                UI.m_loginbarOK:Enable(true)
+                UI.m_loginbarOK:SetLabel("确定")
+                
+                wx.wxMessageBox("超时",
+                    "超时",
+                    wx.wxOK + wx.wxICON_INFORMATION)
+                
+                disconnect()
+            else
+                return
+            end
         elseif status == "ok" then
             if UI.LoginDialog:IsModal() then
                 UI.LoginDialog:EndModal(wx.wxID_OK)
@@ -374,10 +437,23 @@ UI.m_loginbarOK:Connect( wx.wxEVT_COMMAND_BUTTON_CLICKED, function(event)
     UI.m_cam_timer:Stop()
    
     local isOk,errMsg = sendLoginRequest()
-    if isOk then      
+    if isOk then
+      interval = 5000
+      if not connInfo.request_poll_interval then
+        local value = connInfo.request_poll_interval
+        if type(value) == "string" and value ~= "" then
+          value = tonumber(value)
+          if value > 0 then
+            interval = value * 1000
+          end
+        elseif type(value) == "number" and value > 0 then
+          interval = value * 1000
+        end
+      end
       UI.m_loginbarOK:SetLabel("申请中...")
       UI.m_loginbarOK:Disable()
-      UI.m_poll_timer:Start(5000)
+      UI.m_poll_timer:Start(interval)
+      startAt = os.time()
       return
     end
    
@@ -400,7 +476,6 @@ UI.m_cam_timer:Start(100)
 -- show the frame window
 result = UI.LoginDialog:ShowModal()
 UI.m_cam_timer:Stop()
-
 if result ~= wx.wxID_OK and result ~= wx.wxID_YES then
     return
 end
@@ -409,20 +484,101 @@ end
 
 local screenProc = wx.wxProcess()
 screenProc:Redirect()
-screenProc:Connect(wx.wxEVT_END_PROCESS, function(event) 
-  event:Skip()
+screenProc:Connect(wx.wxEVT_END_PROCESS, function(event)
+  wx.wxMessageBox("推流失败",
+                "推流失败",
+                wx.wxOK + wx.wxICON_INFORMATION)
+                
+    
+    if UI.MainFrame:IsModal() then
+        UI.MainFrame:EndModal(wx.wxID_OK)
+    end
+    
+    event:Skip()
 end)
-local screenPid = wx.wxExecute(screenToRstp, false, screenProc)
+
+local isPingCheckRunning = false
+UI.MainFrame:Connect(wx.wxEVT_TIMER, function(event)
+    event:Skip()
+    
+    if isPingCheckRunning then
+       return
+    end
+    isPingCheckRunning = true
+    
+    local proc = wx.wxProcess()
+    proc:Redirect()
+    proc:Connect(wx.wxEVT_END_PROCESS, function(event) 
+        isPingCheckRunning = false
+
+		local inputStream = proc:GetInputStream ()
+		local out = inputStream:Read(100)
+		while not inputStream:Eof() do
+			out = out .. inputStream:Read(100)
+		end
+		
+		wx.wxMessageBox(out, out, wx.wxOK + wx.wxICON_INFORMATION)
+
+		local found = string.find(out, "100%% 丢失")
+		if found then
+			wx.wxMessageBox("连接已断开", "连接已断开", 
+					wx.wxOK + wx.wxICON_INFORMATION)
+			UI.m_check_timer:Stop()
+			return
+		end
+    end)
+    
+    local ok, point = getCurrentAccessPoint()
+    if not ok then
+        wx.wxMessageBox("访问点的 IP 为空, 将无法判断网络是否断开",
+                "运行命令失败",
+                wx.wxOK + wx.wxICON_INFORMATION)
+        UI.m_check_timer:Stop()
+        return
+    end
+    if point.ip == nil or point.ip == "" then
+        wx.wxMessageBox("访问点的 IP 为空, 将无法判断网络是否断开",
+                "运行命令失败",
+                wx.wxOK + wx.wxICON_INFORMATION)
+        UI.m_check_timer:Stop()
+        return
+    end
+
+    local command = "ping ".. point.ip .. "-c 4"
+    if isWindow then
+       command = "ping ".. point.ip
+    end
+    
+    wx.wxMessageBox(command,
+                command,
+                wx.wxOK + wx.wxICON_INFORMATION)
+    local pid = wx.wxExecute(command, wx.wxEXEC_ASYNC, proc)
+    if not pid or pid == -1 or pid == 0 then
+        UI.m_cam_timer:Stop()
+        
+        wx.wxMessageBox(("Program unable to run as '%s'."):format(cmd),
+                    "运行命令失败",
+                    wx.wxOK + wx.wxICON_INFORMATION,
+                    UI.LoginDialog)
+        return
+    end
+end)
+
+local command = string.format(screenToMediaServer, "  \"" .. connInfo.media_server .. connID .. "\"")
+print(command)
+local screenPid = wx.wxExecute(command , wx.wxEXEC_ASYNC, screenProc)
 if not screenPid or screenPid == -1 or screenPid == 0 then
-    wx.wxMessageBox(("Program unable to run as '%s'."):format(cmd),
+    wx.wxMessageBox(("Program unable to run as '%s'."):format(command),
                 "运行命令失败",
                 wx.wxOK + wx.wxICON_INFORMATION,
                 UI.LoginDialog)
     return
 end
+print(command)
 
+UI.m_check_timer:Start(5000)
 local result = UI.MainFrame:ShowModal()
-
+UI.m_check_timer:Stop()
 disconnect()
 
 local killResult = wx.wxKill(screenPid, wx.wxSIGINT)
