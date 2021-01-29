@@ -414,7 +414,7 @@ UI.LoginDialog:Connect(wx.wxEVT_TIMER, function(event)
         isRunning = false
     end)
     
-    
+    print(camToImage)
     local pid = wx.wxExecute(camToImage, false, proc)
     if not pid or pid == -1 or pid == 0 then
         UI.m_cam_timer:Stop()
@@ -482,20 +482,6 @@ end
 
 
 
-local screenProc = wx.wxProcess()
-screenProc:Redirect()
-screenProc:Connect(wx.wxEVT_END_PROCESS, function(event)
-  wx.wxMessageBox("推流失败",
-                "推流失败",
-                wx.wxOK + wx.wxICON_INFORMATION)
-                
-    
-    if UI.MainFrame:IsModal() then
-        UI.MainFrame:EndModal(wx.wxID_OK)
-    end
-    
-    event:Skip()
-end)
 
 local isPingCheckRunning = false
 UI.MainFrame:Connect(wx.wxEVT_TIMER, function(event)
@@ -517,7 +503,7 @@ UI.MainFrame:Connect(wx.wxEVT_TIMER, function(event)
 			out = out .. inputStream:Read(100)
 		end
 		
-		wx.wxMessageBox(out, out, wx.wxOK + wx.wxICON_INFORMATION)
+		print(out)
 
 		local found = string.find(out, "100%% 丢失")
 		if found then
@@ -562,6 +548,23 @@ UI.MainFrame:Connect(wx.wxEVT_TIMER, function(event)
                     UI.LoginDialog)
         return
     end
+end)
+
+
+local screenProc = wx.wxProcess()
+-- 加了下面一行后，视频流一会会断开
+-- screenProc:Redirect()
+screenProc:Connect(wx.wxEVT_END_PROCESS, function(event)
+  wx.wxMessageBox("推流失败",
+                "推流失败",
+                wx.wxOK + wx.wxICON_INFORMATION)
+                
+    
+    if UI.MainFrame:IsModal() then
+        UI.MainFrame:EndModal(wx.wxID_OK)
+    end
+    
+    event:Skip()
 end)
 
 local command = string.format(screenToMediaServer, "  \"" .. connInfo.media_server .. connID .. "\"")

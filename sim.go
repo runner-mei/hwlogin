@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/runner-mei/goutils/util"
 )
 
 var dir string
@@ -64,7 +66,7 @@ func index(w http.ResponseWriter, r *http.Request) {
 "msg":"获得接入点列表成功",
 "request_poll_interval": 5,
 "request_timeout": 300,
-"media_server": "127.0.0.1",
+"media_server": "rtmp://127.0.0.1",
 "list":[
 {
 "id":1,
