@@ -21,7 +21,7 @@ end
 local wxID_CAM_TIMER =NewID()
 local wxID_POLL_TIMER = NewID()
 
-    
+
 UI = {}
 app = wx.wxGetApp()
 stdpaths = wx.wxStandardPaths.Get()
@@ -344,13 +344,14 @@ if result ~= wx.wxID_OK and result ~= wx.wxID_YES then
 end
 
 
-local isRunning = false
+local camProc
 local startAt
 UI.LoginDialog:Connect(wx.wxEVT_TIMER, function(event)
-    event:Skip()
     
     local eventID = event:GetId()
     if eventID == wxID_POLL_TIMER then
+        event:Skip()
+    
         local ok, status, msg = pollLoginStatus()
         if not ok then
             wx.wxMessageBox(msg,
@@ -402,21 +403,68 @@ UI.LoginDialog:Connect(wx.wxEVT_TIMER, function(event)
         return
     end
 
-    if isRunning then
+    
+    
+    if camProc ~= nil then
+        local foo = {}
+        local imagefilename = wx.wxFileName(images, "image-*.jpg"):GetFullPath()
+		local fi = wx.wxFindFirstFile(imagefilename, wx.wxFILE)
+		while fi and #fi>0 do
+            table.insert(foo, fi)
+		 	fi = wx.wxFindNextFile()
+		end
+        
+        if #foo > 0 then
+            local lastFile = foo[#foo]
+            if #foo >= 2 then
+                lastFile = foo[#foo-1]
+            end
+            -- print(lastFile)
+            
+            -- local imagefilename = wx.wxFileName(images, lastFile):GetFullPath()
+            local image = wx.wxImage(lastFile)
+            local size = UI.m_cam_bitmap:GetSize()
+            image = image:Rescale(size:GetWidth(), size:GetHeight())    
+            UI.m_cam_bitmap:SetBitmap(wx.wxBitmap(image))
+            imagefile = lastFile
+            
+            
+            for i, name in ipairs(foo) do
+               if name ~= lastFile then
+                  os.remove(name);
+               end
+            end        
+        end
+    
+       local input = camProc:GetInputStream () 
+       local data = ""
+       while input:CanRead () do
+         data = data .. input:Read(100)
+       end
+       print(data)
+       
+       input = camProc:GetErrorStream () 
+       local data = ""
+       while input:CanRead () do
+         data = data .. input:Read(100)
+       end
+       print(data)
+       
+       
+       event:Skip()
        return
     end
     
-    isRunning = true
-    
-    local proc = wx.wxProcess()
-    proc:Redirect()
-    proc:Connect(wx.wxEVT_END_PROCESS, function(event) 
-        isRunning = false
+    camProc = wx.wxProcess()
+    camProc:Redirect()
+    camProc:Connect(wx.wxEVT_END_PROCESS, function(event) 
+        camProc = nil
     end)
     
     print(camToImage)
-    local pid = wx.wxExecute(camToImage, false, proc)
+    local pid = wx.wxExecute(camToImage, wx.wxEXEC_ASYNC, camProc)
     if not pid or pid == -1 or pid == 0 then
+        camProc = nil
         UI.m_cam_timer:Stop()
         
         wx.wxMessageBox(("Program unable to run as '%s'."):format(cmd),
@@ -425,16 +473,13 @@ UI.LoginDialog:Connect(wx.wxEVT_TIMER, function(event)
                     UI.LoginDialog)
         return
     end
-    
-    local imagefilename = wx.wxFileName(images, imagefile):GetFullPath()
-    local image = wx.wxImage(imagefilename) 
-    local size = UI.m_cam_bitmap:GetSize()
-    image = image:Rescale(size:GetWidth(), size:GetHeight())    
-    UI.m_cam_bitmap:SetBitmap(wx.wxBitmap(image))
+    event:Skip()
 end)
 
 UI.m_loginbarOK:Connect( wx.wxEVT_COMMAND_BUTTON_CLICKED, function(event)
     UI.m_cam_timer:Stop()
+    camProc.Kill()
+    camProc = nil
    
     local isOk,errMsg = sendLoginRequest()
     if isOk then
@@ -461,7 +506,7 @@ UI.m_loginbarOK:Connect( wx.wxEVT_COMMAND_BUTTON_CLICKED, function(event)
                 "…Í«ÎΩ”»Î ß∞‹",
                 wx.wxOK + wx.wxICON_INFORMATION)
    
-    UI.m_cam_timer:Start(100)
+    UI.m_cam_timer:Start(50)
 end)
 
 print("=====begin")
@@ -472,7 +517,7 @@ for _, value in ipairs(connInfo.list) do
 end
 print("=====end")
 
-UI.m_cam_timer:Start(100)
+UI.m_cam_timer:Start(50)
 -- show the frame window
 result = UI.LoginDialog:ShowModal()
 UI.m_cam_timer:Stop()
