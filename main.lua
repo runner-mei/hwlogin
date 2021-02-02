@@ -10,6 +10,9 @@ http = require("http")
 json  = require("dkjson")
 utf8 = require("utf8")
 
+local function log(msg)
+  print(msg)
+end
 
 local IDCounter = nil
 local function NewID()
@@ -20,7 +23,6 @@ end
 
 local wxID_CAM_TIMER =NewID()
 local wxID_POLL_TIMER = NewID()
-
 
 UI = {}
 app = wx.wxGetApp()
@@ -59,13 +61,35 @@ function readAll(file)
     return current
 end
 
-print(screenToMediaServer)
+log(screenToMediaServer)
 screenToMediaServer = readAll(screenToMediaServer)
 if screenToMediaServer == "" then
-   print("screenToMediaServer is empty")
+   log("screenToMediaServer is empty")
    return
 end
-print(screenToMediaServer)
+log(screenToMediaServer)
+
+
+function readImages()
+	local foo = {}
+	local imagefilename = wx.wxFileName(images, "image-*.jpg"):GetFullPath()
+	local fi = wx.wxFindFirstFile(imagefilename, wx.wxFILE)
+	while fi and #fi>0 do
+		table.insert(foo, fi)
+		fi = wx.wxFindNextFile()
+	end
+	return foo
+end
+
+function removeImages(foo, skipFile)
+	for i, name in ipairs(foo) do
+	   if name ~= skipFile then
+		  os.remove(name);
+	   end
+	end  
+end
+
+removeImages(readImages(), "")
 
 local connInfo = {
     ["list"] = {{
@@ -98,7 +122,7 @@ function connectServer(url)
         if not response.output or response.output == "" then
             response.output = "参数不正确"
         end
-        print("1")
+        log("1")
         return false, response.output
     end
     local o, pos, err = json.decode(response.output)
@@ -106,10 +130,10 @@ function connectServer(url)
         if not response.output then
            response.output = "返回的数据不正确"
         end
-        print("2")
-        print(pos)
-        print(err)
-        print(response.output)
+        log("2")
+        log(pos)
+        log(err)
+        log(response.output)
         return false, response.output
     end
 
@@ -161,7 +185,7 @@ function sendLoginRequest()
     end
     
     if not o.id then       
-        print(response.output)
+        log(response.output)
         return false, "响应中没有找到 id -- " .. response.output
     end
     
@@ -220,6 +244,8 @@ UI.ConnectDialog = wx.wxDialog (wx.NULL, wx.wxID_ANY, "连接到服务器...", wx.wxDe
 	UI.bSizer1 = wx.wxBoxSizer( wx.wxVERTICAL )
 	
 	UI.m_addressChoices = {}
+	
+	UI.m_addressChoices = { "http://168.100.2.8:8083",  "http://127.0.0.1:8000"}
 	UI.m_address = wx.wxComboBox( UI.ConnectDialog, wx.wxID_ANY, "http://127.0.0.1:8000", wx.wxDefaultPosition, wx.wxDefaultSize, UI.m_addressChoices, 0 )
 	UI.bSizer1:Add( UI.m_address, 0, wx.wxALL + wx.wxEXPAND, 5 )
 	
@@ -345,6 +371,7 @@ end
 
 
 local camProc
+local camPid
 local startAt
 UI.LoginDialog:Connect(wx.wxEVT_TIMER, function(event)
     
@@ -374,7 +401,7 @@ UI.LoginDialog:Connect(wx.wxEVT_TIMER, function(event)
             end
       
             
-            print("elapsed="..elapsed .. ", timeout="..maxtimeout)
+            log("elapsed="..elapsed .. ", timeout="..maxtimeout)
             if elapsed > maxtimeout then
                 UI.m_poll_timer:Stop()
                 UI.m_loginbarOK:Enable(true)
@@ -406,20 +433,13 @@ UI.LoginDialog:Connect(wx.wxEVT_TIMER, function(event)
     
     
     if camProc ~= nil then
-        local foo = {}
-        local imagefilename = wx.wxFileName(images, "image-*.jpg"):GetFullPath()
-		local fi = wx.wxFindFirstFile(imagefilename, wx.wxFILE)
-		while fi and #fi>0 do
-            table.insert(foo, fi)
-		 	fi = wx.wxFindNextFile()
-		end
-        
+        local foo = readImages()
         if #foo > 0 then
             local lastFile = foo[#foo]
             if #foo >= 2 then
                 lastFile = foo[#foo-1]
             end
-            -- print(lastFile)
+            -- log(lastFile)
             
             -- local imagefilename = wx.wxFileName(images, lastFile):GetFullPath()
             local image = wx.wxImage(lastFile)
@@ -428,12 +448,7 @@ UI.LoginDialog:Connect(wx.wxEVT_TIMER, function(event)
             UI.m_cam_bitmap:SetBitmap(wx.wxBitmap(image))
             imagefile = lastFile
             
-            
-            for i, name in ipairs(foo) do
-               if name ~= lastFile then
-                  os.remove(name);
-               end
-            end        
+            removeImages(foo, lastFile)
         end
     
        local input = camProc:GetInputStream () 
@@ -441,14 +456,14 @@ UI.LoginDialog:Connect(wx.wxEVT_TIMER, function(event)
        while input:CanRead () do
          data = data .. input:Read(100)
        end
-       print(data)
+       log(data)
        
        input = camProc:GetErrorStream () 
        local data = ""
        while input:CanRead () do
          data = data .. input:Read(100)
        end
-       print(data)
+       log(data)
        
        
        event:Skip()
@@ -459,12 +474,14 @@ UI.LoginDialog:Connect(wx.wxEVT_TIMER, function(event)
     camProc:Redirect()
     camProc:Connect(wx.wxEVT_END_PROCESS, function(event) 
         camProc = nil
+        camPid = nil
     end)
     
-    print(camToImage)
+    log(camToImage)
     local pid = wx.wxExecute(camToImage, wx.wxEXEC_ASYNC, camProc)
     if not pid or pid == -1 or pid == 0 then
         camProc = nil
+        camPid = nil
         UI.m_cam_timer:Stop()
         
         wx.wxMessageBox(("Program unable to run as '%s'."):format(cmd),
@@ -473,13 +490,17 @@ UI.LoginDialog:Connect(wx.wxEVT_TIMER, function(event)
                     UI.LoginDialog)
         return
     end
+    camPid = pid
     event:Skip()
 end)
 
 UI.m_loginbarOK:Connect( wx.wxEVT_COMMAND_BUTTON_CLICKED, function(event)
     UI.m_cam_timer:Stop()
-    camProc.Kill()
-    camProc = nil
+    if camPid ~= nil then
+		wx.wxKill(camPid, wx.wxSIGINT)
+		camProc = nil
+		camPid = nil
+    end
    
     local isOk,errMsg = sendLoginRequest()
     if isOk then
@@ -499,6 +520,9 @@ UI.m_loginbarOK:Connect( wx.wxEVT_COMMAND_BUTTON_CLICKED, function(event)
       UI.m_loginbarOK:Disable()
       UI.m_poll_timer:Start(interval)
       startAt = os.time()
+      
+      local foo = readImages()
+      removeImages(foo, "")
       return
     end
    
@@ -506,16 +530,18 @@ UI.m_loginbarOK:Connect( wx.wxEVT_COMMAND_BUTTON_CLICKED, function(event)
                 "申请接入失败",
                 wx.wxOK + wx.wxICON_INFORMATION)
    
+    local foo = readImages()
+    removeImages(foo, "")
     UI.m_cam_timer:Start(50)
 end)
 
-print("=====begin")
+log("=====begin")
 UI.m_endpoints:Clear()
 for _, value in ipairs(connInfo.list) do
-    print(value["name"])
+    log(value["name"])
     UI.m_endpoints:Append(value["name"])
 end
-print("=====end")
+log("=====end")
 
 UI.m_cam_timer:Start(50)
 -- show the frame window
@@ -548,7 +574,7 @@ UI.MainFrame:Connect(wx.wxEVT_TIMER, function(event)
 			out = out .. inputStream:Read(100)
 		end
 		
-		print(out)
+		log(out)
 
 		local found = string.find(out, "100%% 丢失")
 		if found then
@@ -613,7 +639,7 @@ screenProc:Connect(wx.wxEVT_END_PROCESS, function(event)
 end)
 
 local command = string.format(screenToMediaServer, "  \"" .. connInfo.media_server .. connID .. "\"")
-print(command)
+log(command)
 local screenPid = wx.wxExecute(command , wx.wxEXEC_ASYNC, screenProc)
 if not screenPid or screenPid == -1 or screenPid == 0 then
     wx.wxMessageBox(("Program unable to run as '%s'."):format(command),
@@ -622,7 +648,7 @@ if not screenPid or screenPid == -1 or screenPid == 0 then
                 UI.LoginDialog)
     return
 end
-print(command)
+log(command)
 
 UI.m_check_timer:Start(5000)
 local result = UI.MainFrame:ShowModal()

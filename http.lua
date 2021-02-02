@@ -12,6 +12,11 @@ if not isWindow then
   curl = "curl"
 end
 
+
+function log(msg) 
+  -- print(msg)
+end 
+
 function join(baseURL, pa) 
   if xstr:endswith(baseURL, "/") then
     if xstr:startswith(pa, "/") then
@@ -31,15 +36,15 @@ end
 function dump(o)
  if type(o) == "table" then
     for k, v in pairs(o) do
-      print(k)
-      print(v)
+      log(k)
+      log(v)
     end
     for i, v in ipairs(o) do
-      print(k)
-      print(v)
+      log(k)
+      log(v)
     end
   else
-    print(o)
+    log(o)
   end
 end
 
@@ -69,9 +74,9 @@ local testCases = {
 for _, a in ipairs(testCases) do 
   local actual = join(a.a, a.b)
   if actual ~= a.result then
-    print("ERROR: a=" ..a.a .. ", b=" ..a.b .. ", result=" ..a.result)
+    log("ERROR: a=" ..a.a .. ", b=" ..a.b .. ", result=" ..a.result)
   else
-    print("   OK: a=" ..a.a .. ", b=" ..a.b .. ", result=" ..a.result)
+    log("   OK: a=" ..a.a .. ", b=" ..a.b .. ", result=" ..a.result)
   end
 end
 
@@ -164,7 +169,7 @@ function concat(o, delm)
 end
 
 function doHttp(command)
-    print(command)
+    log(command)
     local a, out, err = wx.wxExecuteStdoutStderr(command, wx.wxEXEC_SYNC)
     if not a or a ~= 0 then        
         return {
