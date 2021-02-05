@@ -11,12 +11,12 @@ json  = require("dkjson")
 utf8 = require("utf8")
 
 
+os.remove("login.log")
 
 -- 以附加的方式打开只写文件
 file = io.open("login.log", "a")
 local function logMsg(msg)
   file:write(msg)
-  file:write("\r\n")
   print(msg)
 end
 
@@ -129,7 +129,7 @@ function connectServer(url)
         if not response.output or response.output == "" then
             response.output = "参数不正确"
         end
-        logMsg("1")
+        logMsg("1\r\n")
         return false, response.output
     end
     local o, pos, err = json.decode(response.output)
@@ -137,10 +137,10 @@ function connectServer(url)
         if not response.output then
            response.output = "返回的数据不正确"
         end
-        logMsg("2")
-        logMsg(pos)
-        logMsg(err)
-        logMsg(response.output)
+        logMsg("2\r\n")
+        logMsg(pos.."\r\n")
+        logMsg(err.."\r\n")
+        logMsg(response.output.."\r\n")
         return false, response.output
     end
 
@@ -193,7 +193,7 @@ function sendLoginRequest()
     end
     
     if not o.id then       
-        logMsg(response.output)
+        logMsg(response.output.."\r\n")
         return false, "响应中没有找到 id -- " .. response.output
     end
     
@@ -365,7 +365,7 @@ UI.m_connectbarOK:Connect( wx.wxEVT_COMMAND_BUTTON_CLICKED, function(event)
     local isOk, errMsg = connectServer(http.join(UI.m_address:GetValue(), "/api/accessPointList"))
     if isOk then
         UI.ConnectDialog:Destroy()
-        logMsg("ConnectDialog:Destroy()")
+        logMsg("ConnectDialog:Destroy()\r\n")
         startLoginDialog()
         return
     end
@@ -378,11 +378,11 @@ end)
 
 UI.m_connectbarCancel:Connect(wx.wxEVT_COMMAND_BUTTON_CLICKED,
     function (event)
-        log("connect cannel")
+        logMsg("connect cannel")
         UI.ConnectDialog:Destroy()
         logMsg("ConnectDialog:Destroy()")
         event:Skip()
-        log("connect cannel")
+        logMsg("connect cannel")
     end)
 
 UI.ConnectDialog:Connect(wx.wxEVT_CLOSE_WINDOW,
@@ -427,9 +427,8 @@ UI.LoginDialog:Connect(wx.wxEVT_TIMER, function(event)
                   interval = reqValue * 1000
                 end
             end
-      
             
-            log("elapsed="..elapsed .. ", timeout="..maxtimeout)
+            logMsg("elapsed="..elapsed .. ", timeout="..maxtimeout .. "\r\n")
             if elapsed > maxtimeout then
                 if UI.m_poll_timer:IsRunning() then
                   UI.m_poll_timer:Stop()
@@ -580,13 +579,13 @@ end)
 
 
 function startLoginDialog() 
-    log("=====begin")
+    logMsg("=====begin\r\n")
     UI.m_endpoints:Clear()
     for _, value in ipairs(connInfo.list) do
-        logMsg(value["name"])
+        logMsg(value["name"].."\r\n")
         UI.m_endpoints:Append(value["name"])
     end
-    log("=====end")
+    logMsg("=====end\r\n")
 
     UI.m_cam_timer:Start(50)
     counter = counter + 1
@@ -599,12 +598,12 @@ UI.LoginDialog:Connect(wx.wxEVT_CLOSE_WINDOW,
     function (event)
         
         UI.LoginDialog:Destroy()
-        logMsg("LoginDialog:Destroy() at Close")
+        logMsg("LoginDialog:Destroy() at Close\r\n")
         event:Skip()
         
         UI.m_cam_timer:Stop()
         counter = counter - 1
-        logMsg("counter=" .. counter)
+        logMsg("counter=" .. counter.."\r\n")
         if camPid ~= nil then
             wx.wxKill(camPid, wx.wxSIGINT)
             camProc = nil
@@ -625,7 +624,7 @@ UI.MainFrame:Connect(wx.wxEVT_TIMER, function(event)
     event:Skip()
     
     if screenProc then
-       logMsg("111")
+       logMsg("111\r\n")
        local input = screenProc:GetInputStream () 
        local data = ""
        while input:CanRead () do
@@ -669,7 +668,7 @@ UI.MainFrame:Connect(wx.wxEVT_TIMER, function(event)
        command = "ping ".. point.ip
     end
     
-    logMsg("run " .. command)
+    logMsg("run " .. command.."\r\n")
     pingProc = wx.wxProcess()
     pingProc:Redirect()
     pingProc:Connect(wx.wxEVT_END_PROCESS, function(event)
@@ -693,7 +692,7 @@ UI.MainFrame:Connect(wx.wxEVT_TIMER, function(event)
 				local size = UI.m_bitmap2:GetSize()
 				image = image:Rescale(40, 40)
 				UI.m_bitmap2:SetBitmap(wx.wxBitmap(image))
-				logMsg("连接已断开")
+				logMsg("连接已断开\r\n")
             end
         else
             if not pingOK then
@@ -702,10 +701,10 @@ UI.MainFrame:Connect(wx.wxEVT_TIMER, function(event)
 				local size = UI.m_bitmap2:GetSize()
 				image = image:Rescale(40, 40)
 				UI.m_bitmap2:SetBitmap(wx.wxBitmap(image))
-				logMsg("连接已断开")
+				logMsg("连接已断开\r\n")
             end
         end
-        logMsg("ping exit")
+        logMsg("ping exit\r\n")
         
 		UI.MainFrame:ProcessEvent(wx.wxCommandEvent(wx.wxEVT_CLOSE_WINDOW, UI.MainFrame:GetId()))
     end)
@@ -733,13 +732,13 @@ function startMainFrame()
                     wx.wxOK + wx.wxICON_INFORMATION)
 
         event:Skip()
-        logMsg("screen exit")
+        logMsg("screen exit\r\n")
         
 		UI.MainFrame:ProcessEvent(wx.wxCommandEvent(wx.wxEVT_CLOSE_WINDOW, UI.MainFrame:GetId()))
     end)
 
     local command = screenToMediaServer .. "  \"" .. connInfo.media_server .. connID .. "\""
-    logMsg("run " ..command)
+    logMsg("run " ..command.."\r\n")
     screenPid = wx.wxExecute(command , wx.wxEXEC_ASYNC, screenProc)
     if not screenPid or screenPid == -1 or screenPid == 0 then
         screenProc = nil
@@ -748,7 +747,6 @@ function startMainFrame()
                     wx.wxOK + wx.wxICON_INFORMATION)
         return
     end
-    logMsg(command)
     UI.m_check_timer:Start(1000)
     counter = counter + 1
     UI.MainFrame:Show(true)
@@ -758,7 +756,7 @@ end
 
 local exited = false
 function stopScreen()
-        logMsg("0")
+        logMsg("0\r\n")
         
         if not exited then
             if UI.m_check_timer:IsRunning() then
@@ -769,7 +767,7 @@ function stopScreen()
         end
         
         if pingPid and pingPid > 0 then
-            logMsg("kill ping")
+            logMsg("kill ping\r\n")
             
             local killResult = wx.wxKill(pingPid, wx.wxSIGINT)
             if killResult ~= wx.wxKILL_OK and killResult ~= wx.wxKILL_NO_PROCESS then
@@ -784,7 +782,7 @@ function stopScreen()
         end
         
         if screenPid and screenPid > 0 then
-            logMsg("kill screen")
+            logMsg("kill screen\r\n")
             local killResult = wx.wxKill(screenPid, wx.wxSIGINT)
             if killResult ~= wx.wxKILL_OK and killResult ~= wx.wxKILL_NO_PROCESS then
                 killResult = wx.wxKill(screenPid, wx.wxSIGKILL)
@@ -803,13 +801,13 @@ function stopScreen()
 
             logMsg("2")
             UI.MainFrame:Destroy()
-            logMsg("MainFrame:Destroy()")
-            logMsg("counter=" .. counter)
+            logMsg("MainFrame:Destroy()\r\n")
+            logMsg("counter=" .. counter.."\r\n")
             
             os.exit(1)
         end
         
-        logMsg("3")
+        logMsg("3\r\n")
     end
 
 UI.MainFrame:Connect(wx.wxEVT_CLOSE_WINDOW, function(event)
