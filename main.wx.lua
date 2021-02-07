@@ -170,12 +170,18 @@ function sendLoginRequest()
        return isOk, idOrMsg
     end
     local username = UI.m_username:GetValue()
+    
+    local localimages = imagefile
+    if  isWindow then
+      localimages = wx.wxFileName(images, imagefile):GetFullPath()
+    end
+    
     local response = http.postWithFiles(http.join(hostAddress, "/api/link/apply"),
       {
         name = username,
         accessPointId = idOrMsg,
       },{
-        image = wx.wxFileName(images, imagefile):GetFullPath(),
+        image = localimages,
       })
     if not response.isOk then
         if not response.output or response.output == "" then
