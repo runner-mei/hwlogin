@@ -9,7 +9,7 @@ isWindow = osinfo:GetOperatingSystemFamilyName() == "Windows"
 local currentWorkDirectory = wx.wxFileName(stdpaths:GetExecutablePath()):GetPath(wx.wxPATH_GET_VOLUME or wx.wxPATH_GET_SEPARATOR)
 local curl = wx.wxFileName(currentWorkDirectory, "curl.exe"):GetFullPath()
 if not isWindow then
-  curl = "/usr/lib/curl"
+  curl = "/usr/bin/curl"
 end
 
 
