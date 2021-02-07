@@ -52,13 +52,13 @@ end
 
 local camToImage = wx.wxFileName(currentWorkDirectory, "toimages.bat"):GetFullPath()
 if not isWindow then
-    camToImage = wx.wxFileName(currentWorkDirectory, "toimages.sh"):GetFullPath()
+    camToImage = "sh  " .. wx.wxFileName(currentWorkDirectory, "toimages.sh"):GetFullPath()
 end
 
 
 local screenToMediaServer = wx.wxFileName(currentWorkDirectory, "screenToMediaServer.bat"):GetFullPath()
 if not isWindow then
-    screenToMediaServer = wx.wxFileName(currentWorkDirectory, "screenToMediaServer.sh"):GetFullPath()
+    screenToMediaServer = "sh " .. wx.wxFileName(currentWorkDirectory, "screenToMediaServer.sh"):GetFullPath()
 end
 
 function readAll(file)
