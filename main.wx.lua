@@ -183,11 +183,14 @@ function sendLoginRequest()
       },{
         image = localimages,
       })
+    print("isOk  ="..response.isOk)
+    print("output="..response.isOk)
+
     if not response.isOk then
         if not response.output or response.output == "" then
             response.output = "参数不正确"
         else
-            response.output = "返回： "
+            response.output = "1返回： "
         end
         return false, response.output
     end
@@ -196,6 +199,8 @@ function sendLoginRequest()
     if not o then
         if not response.output then
             response.output = "返回的数据不正确"
+        else
+            response.output = "2返回： "
         end
         return false, response.output
     end
