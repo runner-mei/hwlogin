@@ -183,10 +183,10 @@ function sendLoginRequest()
       },{
         image = localimages,
       })
-    print("isOk  ="..response.isOk)
-    print("output="..response.isOk)
+    print("output="..response.output)
 
     if not response.isOk then
+    print("isOk  = false")
         if not response.output or response.output == "" then
             response.output = "参数不正确"
         else
@@ -195,6 +195,7 @@ function sendLoginRequest()
         return false, response.output
     end
     
+    print("isOk  = true")
     local o, pos, err = json.decode(response.output)
     if not o then
         if not response.output then
