@@ -13,7 +13,7 @@ utf8 = require("utf8")
 
 os.remove("login.log")
 
--- ÒÔ¸½¼ÓµÄ·½Ê½´ò¿ªÖ»Ğ´ÎÄ¼ş
+-- ä»¥é™„åŠ çš„æ–¹å¼æ‰“å¼€åªå†™æ–‡ä»¶
 file = io.open("login.log", "a")
 local function logMsg(msg)
   file:write(msg)
@@ -43,8 +43,8 @@ local imagefile = "image-1.jpg"
 
 if not wx.wxDirExists(images) then
   if not wx.wxMkdir(images) then    
-    wx.wxMessageBox("´´½¨ images Ä¿Â¼Ê§°Ü",
-                        "´íÎó",
+    wx.wxMessageBox("åˆ›å»º images ç›®å½•å¤±è´¥",
+                        "é”™è¯¯",
                         wx.wxOK + wx.wxICON_INFORMATION)
     return
   end
@@ -101,9 +101,9 @@ local hostAddress
 local connInfo = {
     ["list"] = {{
       ["id"] = 1,
-      ["name"] = "½ÓÈëµã11111",
+      ["name"] = "æ¥å…¥ç‚¹11111",
       ["auditDeviceId"]  = 1,
-      ["hostName"] = "Ö÷»ú1",
+      ["hostName"] = "ä¸»æœº1",
       ["ip"] = "192.168.0.101",
       ["mask"] = "255.255.255.0",
       ["gateway"] = "192.168.0.1",
@@ -127,7 +127,7 @@ function connectServer(url)
     local response = http.get(url)
     if not response.isOk then
         if not response.output or response.output == "" then
-            response.output = "²ÎÊı²»ÕıÈ·"
+            response.output = "å‚æ•°ä¸æ­£ç¡®"
         end
         logMsg("1\r\n")
         return false, response.output
@@ -135,7 +135,7 @@ function connectServer(url)
     local o, pos, err = json.decode(response.output)
     if not o then
         if not response.output then
-           response.output = "·µ»ØµÄÊı¾İ²»ÕıÈ·"
+           response.output = "è¿”å›çš„æ•°æ®ä¸æ­£ç¡®"
         end
         logMsg("2\r\n")
         logMsg(pos.."\r\n")
@@ -153,7 +153,7 @@ end
 function getAccessPointID()
     local txt = UI.m_endpoints:GetStringSelection()
     if not txt or txt == "" then
-      return false, "ÇëÑ¡ÔñÒ»¸öÓĞĞ§µÄ½ÓÈëµã"
+      return false, "è¯·é€‰æ‹©ä¸€ä¸ªæœ‰æ•ˆçš„æ¥å…¥ç‚¹"
     end
    
     for _, value in ipairs(connInfo["list"]) do
@@ -185,7 +185,9 @@ function sendLoginRequest()
       })
     if not response.isOk then
         if not response.output or response.output == "" then
-            response.output = "²ÎÊı²»ÕıÈ·"
+            response.output = "å‚æ•°ä¸æ­£ç¡®"
+        else
+            response.output = "è¿”å›ï¼š "
         end
         return false, response.output
     end
@@ -193,14 +195,14 @@ function sendLoginRequest()
     local o, pos, err = json.decode(response.output)
     if not o then
         if not response.output then
-            response.output = "·µ»ØµÄÊı¾İ²»ÕıÈ·"
+            response.output = "è¿”å›çš„æ•°æ®ä¸æ­£ç¡®"
         end
         return false, response.output
     end
     
     if not o.id then       
         logMsg(response.output.."\r\n")
-        return false, "ÏìÓ¦ÖĞÃ»ÓĞÕÒµ½ id -- " .. response.output
+        return false, "å“åº”ä¸­æ²¡æœ‰æ‰¾åˆ° id -- " .. response.output
     end
     
     connID = o.id
@@ -211,12 +213,12 @@ end
 
 function pollLoginStatus()
     if not connID then
-        return true, "fail", "²ÎÊı²»ÕıÈ·, session Îª¿Õ"
+        return true, "fail", "å‚æ•°ä¸æ­£ç¡®, session ä¸ºç©º"
     end
     local response = http.get(http.join(http.join(hostAddress, "/api/link/"),connID))
     if not response.isOk then
         if not response.output or response.output == "" then
-            response.output = "²ÎÊı²»ÕıÈ·"
+            response.output = "å‚æ•°ä¸æ­£ç¡®"
         end
         return false, nil, response.output
     end
@@ -224,13 +226,13 @@ function pollLoginStatus()
     local o, pos, err = json.decode(response.output)
     if not o then
         if not response.output then
-            response.output = "·µ»ØµÄÊı¾İ²»ÕıÈ·"
+            response.output = "è¿”å›çš„æ•°æ®ä¸æ­£ç¡®"
         end
         return false, nil, response.output
     end
     
     if not o.status then       
-        return false, "ÏìÓ¦ÖĞÃ»ÓĞÕÒµ½ status -- " .. response.output
+        return false, "å“åº”ä¸­æ²¡æœ‰æ‰¾åˆ° status -- " .. response.output
     end
     
     return true, o.status, o.msg
@@ -238,12 +240,12 @@ end
 
 function pollConnectStatus()
     if not connID then
-        return true, "fail", "²ÎÊı²»ÕıÈ·, session Îª¿Õ"
+        return true, "fail", "å‚æ•°ä¸æ­£ç¡®, session ä¸ºç©º"
     end
     local response = http.get(http.join(http.join(hostAddress, "/api/link/status/"),connID))
     if not response.isOk then
         if not response.output or response.output == "" then
-            response.output = "²ÎÊı²»ÕıÈ·"
+            response.output = "å‚æ•°ä¸æ­£ç¡®"
         end
         return false, nil, response.output
     end
@@ -251,13 +253,13 @@ function pollConnectStatus()
     local o, pos, err = json.decode(response.output)
     if not o then
         if not response.output then
-            response.output = "·µ»ØµÄÊı¾İ²»ÕıÈ·"
+            response.output = "è¿”å›çš„æ•°æ®ä¸æ­£ç¡®"
         end
         return false, nil, response.output
     end
     
     if not o.status or o.status ~= "ok" then       
-        return false, "ÏìÓ¦ÖĞÃ»ÓĞÕÒµ½ status -- " .. response.output
+        return false, "å“åº”ä¸­æ²¡æœ‰æ‰¾åˆ° status -- " .. response.output
     end
     
     return true, o.status, o.msg
@@ -265,12 +267,12 @@ end
 
 function disconnect()
     if not connID then
-        return true, "fail", "²ÎÊı²»ÕıÈ·, session Îª¿Õ"
+        return true, "fail", "å‚æ•°ä¸æ­£ç¡®, session ä¸ºç©º"
     end
     local response = http.delete(http.join(http.join(hostAddress, "/api/link/"),connID), "application/json", "{}")
     if not response.isOk then
         if not response.output or response.output == "" then
-            response.output = "²ÎÊı²»ÕıÈ·"
+            response.output = "å‚æ•°ä¸æ­£ç¡®"
         end
         return false, response.output
     end
@@ -279,7 +281,7 @@ function disconnect()
 end
 
 -- create ConnectDialog
-UI.ConnectDialog = wx.wxDialog (wx.NULL, wx.wxID_ANY, "Á¬½Óµ½·şÎñÆ÷...", wx.wxDefaultPosition, wx.wxSize( 438,101 ), wx.wxDEFAULT_DIALOG_STYLE )
+UI.ConnectDialog = wx.wxDialog (wx.NULL, wx.wxID_ANY, "è¿æ¥åˆ°æœåŠ¡å™¨...", wx.wxDefaultPosition, wx.wxSize( 438,101 ), wx.wxDEFAULT_DIALOG_STYLE )
     UI.ConnectDialog:SetSizeHints( wx.wxDefaultSize, wx.wxDefaultSize )
     
     UI.bSizer1 = wx.wxBoxSizer( wx.wxVERTICAL )
@@ -306,7 +308,7 @@ UI.ConnectDialog = wx.wxDialog (wx.NULL, wx.wxID_ANY, "Á¬½Óµ½·şÎñÆ÷...", wx.wxDe
     UI.ConnectDialog:Centre( wx.wxBOTH )
 
 -- create LoginDialog
-UI.LoginDialog = wx.wxDialog (wx.NULL, wx.wxID_ANY, "µÇÂ¼", wx.wxDefaultPosition, wx.wxSize( 848,452 ), wx.wxDEFAULT_FRAME_STYLE+wx.wxTAB_TRAVERSAL )
+UI.LoginDialog = wx.wxDialog (wx.NULL, wx.wxID_ANY, "ç™»å½•", wx.wxDefaultPosition, wx.wxSize( 848,452 ), wx.wxDEFAULT_FRAME_STYLE+wx.wxTAB_TRAVERSAL )
     UI.LoginDialog:SetSizeHints( wx.wxDefaultSize, wx.wxDefaultSize )
     
     UI.bSizer2 = wx.wxBoxSizer( wx.wxHORIZONTAL )
@@ -316,7 +318,7 @@ UI.LoginDialog = wx.wxDialog (wx.NULL, wx.wxID_ANY, "µÇÂ¼", wx.wxDefaultPosition
     
     UI.bSizer6 = wx.wxBoxSizer( wx.wxVERTICAL )
     
-    UI.m_username = wx.wxTextCtrl( UI.m_panel1, wx.wxID_ANY, "ÇëÊäÈëÓÃ»§Ãû", wx.wxDefaultPosition, wx.wxDefaultSize, 0 )
+    UI.m_username = wx.wxTextCtrl( UI.m_panel1, wx.wxID_ANY, "è¯·è¾“å…¥ç”¨æˆ·å", wx.wxDefaultPosition, wx.wxDefaultSize, 0 )
     UI.bSizer6:Add( UI.m_username, 0, wx.wxALL + wx.wxEXPAND, 5 )
     
     UI.m_cam_bitmap = wx.wxStaticBitmap( UI.m_panel1, wx.wxID_ANY, wx.wxBitmap( "none.jpg", wx.wxBITMAP_TYPE_ANY ), wx.wxDefaultPosition, wx.wxDefaultSize, 0 )
@@ -333,7 +335,7 @@ UI.LoginDialog = wx.wxDialog (wx.NULL, wx.wxID_ANY, "µÇÂ¼", wx.wxDefaultPosition
     
     UI.bSizer3 = wx.wxBoxSizer( wx.wxVERTICAL )
     
-    UI.m_staticText2 = wx.wxStaticText( UI.LoginDialog, wx.wxID_ANY, "ÇëÑ¡Ôñ½Úµã£º", wx.wxDefaultPosition, wx.wxDefaultSize, 0 )
+    UI.m_staticText2 = wx.wxStaticText( UI.LoginDialog, wx.wxID_ANY, "è¯·é€‰æ‹©èŠ‚ç‚¹ï¼š", wx.wxDefaultPosition, wx.wxDefaultSize, 0 )
     UI.m_staticText2:Wrap( -1 )
     UI.bSizer3:Add( UI.m_staticText2, 0, wx.wxALL + wx.wxEXPAND, 5 )
     
@@ -348,7 +350,7 @@ UI.LoginDialog = wx.wxDialog (wx.NULL, wx.wxID_ANY, "µÇÂ¼", wx.wxDefaultPosition
     
     UI.bSizer3:Add( UI.m_loginbar, 0, wx.wxEXPAND, 5 )
     
-    UI.m_staticText4 = wx.wxStaticText( UI.LoginDialog, wx.wxID_ANY, "\n  Çë¶Ô×¼ÉãÏñÍ·£¬È»ºóµãÈ·¶¨¡£", wx.wxDefaultPosition, wx.wxDefaultSize, 0 )
+    UI.m_staticText4 = wx.wxStaticText( UI.LoginDialog, wx.wxID_ANY, "\n  è¯·å¯¹å‡†æ‘„åƒå¤´ï¼Œç„¶åç‚¹ç¡®å®šã€‚", wx.wxDefaultPosition, wx.wxDefaultSize, 0 )
     UI.m_staticText4:Wrap( -1 )
     UI.bSizer3:Add( UI.m_staticText4, 0, wx.wxALL, 5 )
     
@@ -366,7 +368,7 @@ UI.LoginDialog = wx.wxDialog (wx.NULL, wx.wxID_ANY, "µÇÂ¼", wx.wxDefaultPosition
     UI.LoginDialog:Centre( wx.wxBOTH )
 
 -- create MainFrame
-UI.MainFrame = wx.wxDialog (wx.NULL, wx.wxID_ANY, "ÒÑµÇÂ¼ÕıÔÚÂ¼ÆÁÖĞ...", wx.wxDefaultPosition, wx.wxSize( 378,77 ), wx.wxDEFAULT_FRAME_STYLE+wx.wxTAB_TRAVERSAL )
+UI.MainFrame = wx.wxDialog (wx.NULL, wx.wxID_ANY, "å·²ç™»å½•æ­£åœ¨å½•å±ä¸­...", wx.wxDefaultPosition, wx.wxSize( 378,77 ), wx.wxDEFAULT_FRAME_STYLE+wx.wxTAB_TRAVERSAL )
     UI.MainFrame:SetSizeHints( wx.wxDefaultSize, wx.wxDefaultSize )
     
     UI.mainSizer = wx.wxBoxSizer( wx.wxHORIZONTAL )
@@ -404,7 +406,7 @@ UI.m_connectbarOK:Connect( wx.wxEVT_COMMAND_BUTTON_CLICKED, function(event)
     end
    
     wx.wxMessageBox(errMsg,
-                "Á¬½Ó·şÎñÆ÷Ê§°Ü",
+                "è¿æ¥æœåŠ¡å™¨å¤±è´¥",
                 wx.wxOK + wx.wxICON_INFORMATION)
 end)
 
@@ -468,10 +470,10 @@ UI.LoginDialog:Connect(wx.wxEVT_TIMER, function(event)
                   counter = counter - 1
                 end
                 UI.m_loginbarOK:Enable(true)
-                UI.m_loginbarOK:SetLabel("È·¶¨")
+                UI.m_loginbarOK:SetLabel("ç¡®å®š")
                 
-                wx.wxMessageBox("³¬Ê±",
-                    "³¬Ê±",
+                wx.wxMessageBox("è¶…æ—¶",
+                    "è¶…æ—¶",
                     wx.wxOK + wx.wxICON_INFORMATION)
                 
                 disconnect()
@@ -499,7 +501,7 @@ UI.LoginDialog:Connect(wx.wxEVT_TIMER, function(event)
         end
         
         UI.m_loginbarOK:Enable(true)
-        UI.m_loginbarOK:SetLabel("È·¶¨")
+        UI.m_loginbarOK:SetLabel("ç¡®å®š")
         return
     end
     
@@ -557,7 +559,7 @@ UI.LoginDialog:Connect(wx.wxEVT_TIMER, function(event)
         counter = counter - 1
         
         wx.wxMessageBox(("Program unable to run as '%s'."):format(cmd),
-                    "ÔËĞĞÃüÁîÊ§°Ü",
+                    "è¿è¡Œå‘½ä»¤å¤±è´¥",
                     wx.wxOK + wx.wxICON_INFORMATION,
                     UI.LoginDialog)
         return
@@ -589,7 +591,7 @@ UI.m_loginbarOK:Connect( wx.wxEVT_COMMAND_BUTTON_CLICKED, function(event)
           interval = value * 1000
         end
       end
-      UI.m_loginbarOK:SetLabel("ÉêÇëÖĞ...")
+      UI.m_loginbarOK:SetLabel("ç”³è¯·ä¸­...")
       UI.m_loginbarOK:Disable()
       UI.m_poll_timer:Start(interval)
       counter = counter + 1
@@ -601,7 +603,7 @@ UI.m_loginbarOK:Connect( wx.wxEVT_COMMAND_BUTTON_CLICKED, function(event)
     end
    
     wx.wxMessageBox(errMsg,
-                "ÉêÇë½ÓÈëÊ§°Ü",
+                "ç”³è¯·æ¥å…¥å¤±è´¥",
                 wx.wxOK + wx.wxICON_INFORMATION)
    
     local foo = readImages()
@@ -680,16 +682,16 @@ UI.MainFrame:Connect(wx.wxEVT_TIMER, function(event)
     
     local ok, point = getCurrentAccessPoint()
     if not ok then
-        wx.wxMessageBox("·ÃÎÊµãµÄ IP Îª¿Õ, ½«ÎŞ·¨ÅĞ¶ÏÍøÂçÊÇ·ñ¶Ï¿ª",
-                "ÔËĞĞÃüÁîÊ§°Ü",
+        wx.wxMessageBox("è®¿é—®ç‚¹çš„ IP ä¸ºç©º, å°†æ— æ³•åˆ¤æ–­ç½‘ç»œæ˜¯å¦æ–­å¼€",
+                "è¿è¡Œå‘½ä»¤å¤±è´¥",
                 wx.wxOK + wx.wxICON_INFORMATION)
         UI.m_check_timer:Stop()
         counter = counter - 1
         return
     end
     if point.ip == nil or point.ip == "" then
-        wx.wxMessageBox("·ÃÎÊµãµÄ IP Îª¿Õ, ½«ÎŞ·¨ÅĞ¶ÏÍøÂçÊÇ·ñ¶Ï¿ª",
-                "ÔËĞĞÃüÁîÊ§°Ü",
+        wx.wxMessageBox("è®¿é—®ç‚¹çš„ IP ä¸ºç©º, å°†æ— æ³•åˆ¤æ–­ç½‘ç»œæ˜¯å¦æ–­å¼€",
+                "è¿è¡Œå‘½ä»¤å¤±è´¥",
                 wx.wxOK + wx.wxICON_INFORMATION)
         UI.m_check_timer:Stop()
         counter = counter - 1
@@ -717,7 +719,7 @@ UI.MainFrame:Connect(wx.wxEVT_TIMER, function(event)
         end
         logMsg(out)
 
-        local found = string.find(out, "100%% ¶ªÊ§")
+        local found = string.find(out, "100%% ä¸¢å¤±")
         if found then
             if pingOK then
 				pingOK = false
@@ -725,7 +727,7 @@ UI.MainFrame:Connect(wx.wxEVT_TIMER, function(event)
 				local size = UI.m_bitmap2:GetSize()
 				image = image:Rescale(40, 40)
 				UI.m_bitmap2:SetBitmap(wx.wxBitmap(image))
-				logMsg("Á¬½ÓÒÑ¶Ï¿ª\r\n")
+				logMsg("è¿æ¥å·²æ–­å¼€\r\n")
             end
         else
             if not pingOK then
@@ -734,7 +736,7 @@ UI.MainFrame:Connect(wx.wxEVT_TIMER, function(event)
 				local size = UI.m_bitmap2:GetSize()
 				image = image:Rescale(40, 40)
 				UI.m_bitmap2:SetBitmap(wx.wxBitmap(image))
-				logMsg("Á¬½ÓÒÑ¶Ï¿ª\r\n")
+				logMsg("è¿æ¥å·²æ–­å¼€\r\n")
             end
         end
         logMsg("ping exit\r\n")
@@ -753,15 +755,15 @@ function startMainFrame()
     UI.MainFrame:Show(true)
    
     screenProc = wx.wxProcess()
-    -- ¼ÓÁËÏÂÃæÒ»ĞĞºó£¬ÊÓÆµÁ÷Ò»»á»á¶Ï¿ª
-    -- ºóÃæ·¢ÏÖºÃÏñ¶¨Ê±´ÓÖØ¶¨ÏòÁ÷ÖĞ¶Á³öÊä³ö¾ÍºÃÁË
+    -- åŠ äº†ä¸‹é¢ä¸€è¡Œåï¼Œè§†é¢‘æµä¸€ä¼šä¼šæ–­å¼€
+    -- åé¢å‘ç°å¥½åƒå®šæ—¶ä»é‡å®šå‘æµä¸­è¯»å‡ºè¾“å‡ºå°±å¥½äº†
     screenProc:Redirect()
     screenProc:Connect(wx.wxEVT_END_PROCESS, function(event)
         screenProc = nil
         screenPid = nil
         
-        wx.wxMessageBox("ÍÆÁ÷Ê§°Ü",
-                    "ÍÆÁ÷Ê§°Ü",
+        wx.wxMessageBox("æ¨æµå¤±è´¥",
+                    "æ¨æµå¤±è´¥",
                     wx.wxOK + wx.wxICON_INFORMATION)
 
         event:Skip()
@@ -776,7 +778,7 @@ function startMainFrame()
     if not screenPid or screenPid == -1 or screenPid == 0 then
         screenProc = nil
         wx.wxMessageBox(("Program unable to run as '%s'."):format(command),
-                    "ÔËĞĞÃüÁîÊ§°Ü",
+                    "è¿è¡Œå‘½ä»¤å¤±è´¥",
                     wx.wxOK + wx.wxICON_INFORMATION)
         return
     end
@@ -807,7 +809,7 @@ function stopScreen()
                 killResult = wx.wxKill(pingPid, wx.wxSIGKILL)
                 if killResult ~= wx.wxKILL_OK and killResult ~= wx.wxKILL_NO_PROCESS then
                     wx.wxMessageBox(("Program unable to run as '%s'."):format(killResult),
-                                "Í£Ö¹ ping ÃüÁîÊ§°Ü",
+                                "åœæ­¢ ping å‘½ä»¤å¤±è´¥",
                                 wx.wxOK + wx.wxICON_INFORMATION)
                 end
             end
@@ -821,7 +823,7 @@ function stopScreen()
                 killResult = wx.wxKill(screenPid, wx.wxSIGKILL)
                 if killResult ~= wx.wxKILL_OK and killResult ~= wx.wxKILL_NO_PROCESS then
                     wx.wxMessageBox(("Program unable to run as '%s'."):format(killResult),
-                                "Í£Ö¹½ØÆÁÃüÁîÊ§°Ü",
+                                "åœæ­¢æˆªå±å‘½ä»¤å¤±è´¥",
                                 wx.wxOK + wx.wxICON_INFORMATION)
                 end
             end
