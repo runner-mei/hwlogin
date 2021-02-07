@@ -1,1 +1,2 @@
-ffmpeg.exe -f gdigrab -framerate 15 -offset_x 10 -offset_y 20 -i desktop -f flv %1
+@echo ffmpeg.exe -f gdigrab -framerate 15 -offset_x 10 -offset_y 20 -i desktop -vcodec libx264 -f flv  %1   >b.log 2>&1
+@ffmpeg.exe -f gdigrab -framerate 15 -offset_x 10 -offset_y 20 -i desktop -vcodec libx264 -f flv  %1   >>b.log 2>&1

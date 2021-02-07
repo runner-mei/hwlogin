@@ -230,6 +230,33 @@ function pollLoginStatus()
     return true, o.status, o.msg
 end
 
+function pollConnectStatus()
+    if not connID then
+        return true, "fail", "参数不正确, session 为空"
+    end
+    local response = http.get(http.join(http.join(hostAddress, "/api/link/status/"),connID))
+    if not response.isOk then
+        if not response.output or response.output == "" then
+            response.output = "参数不正确"
+        end
+        return false, nil, response.output
+    end
+    
+    local o, pos, err = json.decode(response.output)
+    if not o then
+        if not response.output then
+            response.output = "返回的数据不正确"
+        end
+        return false, nil, response.output
+    end
+    
+    if not o.status or o.status ~= "ok" then       
+        return false, "响应中没有找到 status -- " .. response.output
+    end
+    
+    return true, o.status, o.msg
+end
+
 function disconnect()
     if not connID then
         return true, "fail", "参数不正确, session 为空"
@@ -253,8 +280,8 @@ UI.ConnectDialog = wx.wxDialog (wx.NULL, wx.wxID_ANY, "连接到服务器...", wx.wxDe
     
     UI.m_addressChoices = {}
     
-    UI.m_addressChoices = { "http://168.100.2.8:8083",  "http://127.0.0.1:8000"}
-    UI.m_address = wx.wxComboBox( UI.ConnectDialog, wx.wxID_ANY, "http://127.0.0.1:8000", wx.wxDefaultPosition, wx.wxDefaultSize, UI.m_addressChoices, 0 )
+    UI.m_addressChoices = { "http://192.168.1.150:8083", "http://168.100.2.8:8083",  "http://127.0.0.1:8000"}
+    UI.m_address = wx.wxComboBox( UI.ConnectDialog, wx.wxID_ANY, "http://192.168.1.150:8083", wx.wxDefaultPosition, wx.wxDefaultSize, UI.m_addressChoices, 0 )
     UI.bSizer1:Add( UI.m_address, 0, wx.wxALL + wx.wxEXPAND, 5 )
     
     UI.m_connectbar = wx.wxStdDialogButtonSizer()
