@@ -5,6 +5,6 @@
 if [ -z $root_dir ]; then
   root_dir=$(cd `dirname $0`; pwd)
 fi
-LD_LIBRARY_PATH=$root_dir/ffmpeg/lib/
+export LD_LIBRARY_PATH=$root_dir/ffmpeg/lib/
 mkdir -p $root_dir/images/
 $root_dir/ffmpeg/bin/ffmpeg  -f v4l2 -r 25 -i /dev/video0 -vframes 200 -s 640x480 -f image2 $root_dir/images/image-%d.jpg
