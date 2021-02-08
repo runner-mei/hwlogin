@@ -176,14 +176,14 @@ function doHttp(command)
           command = command,
           isOk = false,
           status = 500,
-          output =  concat(err, "\r\n"),
+          output =  wx.wxString.FromUTF8(concat(err, "\r\n")),
         }
     end
     
     return {
       isOk = true,
       status = 200,
-      output = concat(out, "\r\n"),
+      output = wx.wxString.FromUTF8(concat(out, "\r\n")),
     }
 end
 
