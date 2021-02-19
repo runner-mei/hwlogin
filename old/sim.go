@@ -25,7 +25,7 @@ func init() {
 		dir, _ = os.Getwd()
 	}
 }
-func main2() {
+func main() {
 	log.Printf("Serving %s on HTTP port: %s\n", dir, port)
 	log.Fatal(http.ListenAndServe(":"+port, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		log.Println(r.URL.Path)
@@ -48,12 +48,7 @@ func main2() {
 			if strings.HasPrefix(r.URL.Path, "/api/link/") {
 				id := strings.TrimPrefix(r.URL.Path, "/api/link/")
 
-				if strings.HasSuffix(id, "/status") {
-					id = strings.TrimSuffix(r.URL.Path, "/status")
-					w.WriteHeader(http.StatusOK)
-					io.WriteString(w, "OK")
-					return
-				} else if r.Method == http.MethodGet {
+				if r.Method == http.MethodGet {
 					readStatus(w, r, id)
 					return
 				} else if r.Method == http.MethodDelete {
@@ -74,7 +69,7 @@ func index(w http.ResponseWriter, r *http.Request) {
 "media_server": "rtmp://127.0.0.1",
 "list":[
 {
-"id":"1",
+"id":1,
 "name":"接入点11111",
 "auditDeviceId":1,
 "hostName":"主机1",
@@ -86,7 +81,7 @@ func index(w http.ResponseWriter, r *http.Request) {
 "auditDeviceName":null
 },
 {
-"id":"2",
+"id":2,
 "name":"接入点22",
 "auditDeviceId":1,
 "hostName":"主机22",
@@ -98,7 +93,7 @@ func index(w http.ResponseWriter, r *http.Request) {
 "auditDeviceName":null
 },
 {
-"id":"3",
+"id":3,
 "name":"fail",
 "auditDeviceId":1,
 "hostName":"主机22",
@@ -110,7 +105,7 @@ func index(w http.ResponseWriter, r *http.Request) {
 "auditDeviceName":null
 },
 {
-"id":"4",
+"id":4,
 "name":"will_deny",
 "auditDeviceId":1,
 "hostName":"主机22",
