@@ -80,9 +80,9 @@ func main() {
 		}
 	}
 
-	a := app.NewWithID("io.fyne.demo")
+	a := app.NewWithID("cn.com.hengwei.hwlogin")
 	a.SetIcon(theme.FyneLogo())
-	w := a.NewWindow("Fyne Demo")
+	w := a.NewWindow("登录小程序")
 	topWindow = w
 	w.SetMaster()
 
@@ -189,7 +189,8 @@ func makeEntryTab(_ fyne.Window, serverInstance *ServerInstance) fyne.CanvasObje
 		return entry.Text
 	}
 
-	content := canvas.NewImageFromResource(theme.FyneLogo())
+	//content := canvas.NewImageFromResource(theme.FyneLogo())
+	content := canvas.NewImageFromResource(resourceNoneJpg)
 	content.FillMode = canvas.ImageFillContain
 	serverInstance.SetImage = func(img image.Image) {
 		content.Resource = nil
