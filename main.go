@@ -533,23 +533,28 @@ func (si *ServerInstance) startCaptureCam() {
 	}()
 }
 
-func (si *ServerInstance) StopCaptureCam() {
+
+func (si *ServerInstance) stopCaptureXXX() {
 	si.mu.Lock()
-	defer si.mu.Unlock()
-
-	si.stopCaptureCam()
-}
-
-func (si *ServerInstance) stopCaptureCam() {
-	if si.stopWait == nil {
-		return
-	}
-	if si.kill != nil {
-		si.kill()
-	}
-	si.stopWait.Wait()
+	stopWait := si.stopWait
+	kill := si.kill
 	si.stopWait = nil
 	si.kill = nil
+	si.mu.Unlock()
+
+	if stopWait == nil {
+		return
+	}
+	if kill != nil {
+		kill()
+	}
+	stopWait.Wait()
+}
+
+
+
+func (si *ServerInstance) StopCaptureCam() {
+	si.stopCaptureXXX()
 }
 
 func (si *ServerInstance) startCaptureScreen() {
@@ -640,16 +645,8 @@ func (si *ServerInstance) startCaptureScreen() {
 	}()
 }
 
-func (si *ServerInstance) stopCaptureScreen() {
-	if si.stopWait == nil {
-		return
-	}
-	if si.kill != nil {
-		si.kill()
-	}
-	si.stopWait.Wait()
-	si.stopWait = nil
-	si.kill = nil
+func (si *ServerInstance) StopCaptureScreen() {
+	si.stopCaptureXXX()
 }
 
 var cachedBytes = make([]byte, 0, 1*1024*1024)
@@ -701,7 +698,21 @@ func (si *ServerInstance) startConnect(srv *ServerInfo, ni *NodeInfo) error {
 }
 
 func (si *ServerInstance) TestConectOk() {
-	response, err := http.Get(Join(si.address, "/api/link/"+si.connectID))
+	si.mu.Lock()
+	connectID := si.connectID
+
+	if connectID == "" {
+		defer si.mu.Unlock()
+
+		err := errors.New("申请失败, connectID 为空")
+		si.setStatus(unconnected)
+		si.stateChange(unconnected, err.Error())
+		si.stateChange = nil
+		return
+	}
+	si.mu.Unlock()
+
+	response, err := http.Get(Join(si.address, "/api/link/"+connectID))
 	if err != nil {
 		si.mu.Lock()
 		defer si.mu.Unlock()
@@ -910,9 +921,10 @@ func (si *ServerInstance) IsUnconnect() bool {
 }
 func (si *ServerInstance) Connect(srv *ServerInfo, ni *NodeInfo, cb func(connState, string)) {
 	if atomic.CompareAndSwapInt32((*int32)(&si.state), int32(unconnected), int32(connecting)) {
+		si.StopCaptureCam()
+
 		si.mu.Lock()
 		defer si.mu.Unlock()
-		si.stopCaptureCam()
 
 		si.stateChange = cb
 
@@ -942,11 +954,10 @@ func (si *ServerInstance) Cancel() {
 			si.stateChange = nil
 		}
 	} else if atomic.CompareAndSwapInt32((*int32)(&si.state), int32(connected), int32(unconnected)) {
+
+		si.StopCaptureScreen()
 		si.mu.Lock()
 		defer si.mu.Unlock()
-
-		si.stopCaptureScreen()
-
 		if si.stateChange != nil {
 			si.stateChange(unconnected, "已断开")
 			si.stateChange = nil
