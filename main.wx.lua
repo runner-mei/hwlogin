@@ -294,8 +294,8 @@ UI.ConnectDialog = wx.wxDialog (wx.NULL, wx.wxID_ANY, "连接到服务器...", w
     
     UI.m_addressChoices = {}
     
-    UI.m_addressChoices = { "http://192.168.1.150:8083", "http://168.100.2.8:8083",  "http://127.0.0.1:8000"}
-    UI.m_address = wx.wxComboBox( UI.ConnectDialog, wx.wxID_ANY, "http://192.168.1.150:8083", wx.wxDefaultPosition, wx.wxDefaultSize, UI.m_addressChoices, 0 )
+    UI.m_addressChoices = { "http://192.168.0.1:8083", "http://168.100.2.8:8083",  "http://127.0.0.1:8000"}
+    UI.m_address = wx.wxComboBox( UI.ConnectDialog, wx.wxID_ANY, "http://192.168.0.1:8083", wx.wxDefaultPosition, wx.wxDefaultSize, UI.m_addressChoices, 0 )
     UI.bSizer1:Add( UI.m_address, 0, wx.wxALL + wx.wxEXPAND, 5 )
     
     UI.m_connectbar = wx.wxStdDialogButtonSizer()
@@ -496,8 +496,8 @@ UI.LoginDialog:Connect(wx.wxEVT_TIMER, function(event)
             startMainFrame()
             return
         elseif status == "fail" or status == "deny" then
-            wx.wxMessageBox(msg,
-                msg,
+            wx.wxMessageBox("deny",
+                "deny",
                 wx.wxOK + wx.wxICON_INFORMATION)
         end
         
@@ -704,7 +704,7 @@ UI.MainFrame:Connect(wx.wxEVT_TIMER, function(event)
         return
     end
     
-    local command = "ping ".. point.ip .. "-c 4"
+    local command = "ping ".. point.ip .. " -c 4"
     if isWindow then
        command = "ping ".. point.ip
     end
@@ -726,6 +726,9 @@ UI.MainFrame:Connect(wx.wxEVT_TIMER, function(event)
         logMsg(out)
 
         local found = string.find(out, "100%% 丢失")
+        if not found then
+           found = string.find(out, "100%% packet loss")
+        end
         if found then
             if pingOK then
 				pingOK = false
@@ -734,6 +737,7 @@ UI.MainFrame:Connect(wx.wxEVT_TIMER, function(event)
 				image = image:Rescale(40, 40)
 				UI.m_bitmap2:SetBitmap(wx.wxBitmap(image))
 				logMsg("连接已断开\r\n")
+              os.execute("killall ffmpeg")
             end
         else
             if not pingOK then
@@ -747,7 +751,7 @@ UI.MainFrame:Connect(wx.wxEVT_TIMER, function(event)
         end
         logMsg("ping exit\r\n")
         
-		UI.MainFrame:ProcessEvent(wx.wxCommandEvent(wx.wxEVT_CLOSE_WINDOW, UI.MainFrame:GetId()))
+	 --	UI.MainFrame:ProcessEvent(wx.wxCommandEvent(wx.wxEVT_CLOSE_WINDOW, UI.MainFrame:GetId()))
     end)
     
     pingPid = wx.wxExecute(command, wx.wxEXEC_ASYNC, pingProc)
@@ -799,13 +803,6 @@ local exited = false
 function stopScreen()
         logMsg("0\r\n")
         
-        if not exited then
-            if UI.m_check_timer:IsRunning() then
-               UI.m_check_timer:Stop()
-               counter = counter - 1
-            end
-            disconnect()
-        end
         
         if pingPid and pingPid > 0 then
             logMsg("kill ping\r\n")
@@ -819,11 +816,14 @@ function stopScreen()
                                 wx.wxOK + wx.wxICON_INFORMATION)
                 end
             end
-            return
+            -- return
         end
         
         if screenPid and screenPid > 0 then
             logMsg("kill screen\r\n")
+            os.execute( "killall ffmpeg" )
+            os.execute("killall ffmpeg")
+
             local killResult = wx.wxKill(screenPid, wx.wxSIGINT)
             if killResult ~= wx.wxKILL_OK and killResult ~= wx.wxKILL_NO_PROCESS then
                 killResult = wx.wxKill(screenPid, wx.wxSIGKILL)
@@ -833,9 +833,18 @@ function stopScreen()
                                 wx.wxOK + wx.wxICON_INFORMATION)
                 end
             end
-            return
+            -- return
         end
         
+       if not exited then
+            if UI.m_check_timer:IsRunning() then
+               UI.m_check_timer:Stop()
+               counter = counter - 1
+            end
+            disconnect()
+            logMsg("0.0")
+        end
+
         logMsg("1")
         if not exited then
             exited = true
