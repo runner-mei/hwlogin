@@ -72,8 +72,8 @@ func main() {
 		}
 		//楷体:simkai.ttf
 		//黑体:simhei.ttf
-		if strings.Contains(path, "simhei.ttf") || 
-                   strings.Contains(path, "zenhei.ttc"){
+		if strings.Contains(path, "simhei.ttf") ||
+			strings.Contains(path, "zenhei.ttc") {
 			os.Setenv("FYNE_FONT", path)
 			if !showFont {
 				break
@@ -623,9 +623,6 @@ func (si *ServerInstance) startCaptureScreen() {
 
 		err := copyed.Run()
 		if err != nil {
-			if !si.IsConnected() {
-				return
-			}
 			si.mu.Lock()
 			defer si.mu.Unlock()
 
