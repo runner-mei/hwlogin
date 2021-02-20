@@ -533,7 +533,6 @@ func (si *ServerInstance) startCaptureCam() {
 	}()
 }
 
-
 func (si *ServerInstance) stopCaptureXXX() {
 	si.mu.Lock()
 	stopWait := si.stopWait
@@ -550,8 +549,6 @@ func (si *ServerInstance) stopCaptureXXX() {
 	}
 	stopWait.Wait()
 }
-
-
 
 func (si *ServerInstance) StopCaptureCam() {
 	si.stopCaptureXXX()
@@ -614,7 +611,13 @@ func (si *ServerInstance) startCaptureScreen() {
 		copyed.Args = cmd.Args
 		copyed.Env = cmd.Env
 		copyed.Dir = cmd.Dir
+		out, _ := os.Create(filepath.Join(si.rootDir, "screenToMediaServer.log"))
+		if out != nil {
+			copyed.Stdout = out
+			copyed.Stderr = out
 
+			defer out.Close()
+		}
 		si.mu.Lock()
 		si.kill = func() {
 			if copyed.Process != nil {
