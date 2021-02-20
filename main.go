@@ -572,7 +572,7 @@ func (si *ServerInstance) startCaptureScreen() {
 	} else {
 		filename := filepath.Join(si.rootDir, "screenToMediaServer.sh")
 		if FileExists(filename) {
-			cmd = exec.Command("sh", filename)
+			cmd = exec.Command("sh", filename, si.serverInfo.MediaServerURL+si.connectID)
 		} else {
 			cmd = exec.Command(filepath.Join(si.rootDir, "ffmpeg/bin/ffmpeg"),
 				"-f", "x11grab", "-framerate", "25", "-i", ":0.0", "-vcodec", "libx264", "-f", "flv",
@@ -615,7 +615,6 @@ func (si *ServerInstance) startCaptureScreen() {
 		if out != nil {
 			copyed.Stdout = out
 			copyed.Stderr = out
-
 			defer out.Close()
 
 			out.WriteString(copyed.Path)
