@@ -617,6 +617,13 @@ func (si *ServerInstance) startCaptureScreen() {
 			copyed.Stderr = out
 
 			defer out.Close()
+
+			out.WriteString(copyed.Path)
+			for _, arg := range copyed.Args {
+				out.WriteString("\n  ")
+				out.WriteString(arg)
+			}
+			out.WriteString("\n")
 		}
 		si.mu.Lock()
 		si.kill = func() {
