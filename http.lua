@@ -3,6 +3,18 @@ xstr = require("xstr")
 url = require("neturl")
 require("wx")
 
+
+local mp = require("multipart")
+
+
+local arg_filename = ...
+if arg_filename == nil then
+    print("Usage: lua run_test.lua TEST_TABLE_LUA")
+    os.exit(0)
+end
+
+
+
 stdpaths = wx.wxStandardPaths.Get()
 osinfo = wx.wxPlatformInfo.Get()
 isWindow = osinfo:GetOperatingSystemFamilyName() == "Windows"
@@ -86,7 +98,7 @@ function get(pa)
     return {
       isOk = false,
       status = 500,
-      error = "host ²ÎÊý²»ÕýÈ· - '".. pa .."'",
+      error = "host å‚æ•°ä¸æ­£ç¡® - '".. pa .."'",
       }
   end
   
@@ -102,7 +114,7 @@ function get(pa)
   local http = wx.wxHTTP()
   http:Connect( address )
   local rpath = u.path
-  if #(u.query) > 0 then
+  if u.query and #(u.query) > 0 then
    rpath = u.path .. "?" .. url.buildQuery(u.query)
   end
 
@@ -129,6 +141,15 @@ function get(pa)
 end
 
 function postOld(pa, contentType, body)
+  local u = url.parse(pa)
+  if not u.host then
+    return {
+      isOk = false,
+      status = 500,
+      error = "host å‚æ•°ä¸æ­£ç¡® - '".. pa .."'",
+      }
+  end
+  
   local address = wx.wxIPV4address()
   if pcall(address:Hostname( u.host ), -1) == -1 then
     return 
@@ -142,19 +163,66 @@ function postOld(pa, contentType, body)
   local http = wx.wxHTTP()
   http:Connect( address )
   local rpath = u.path
-  if #(u.query) > 0 then
+  if u.query and #(u.query) > 0 then
    rpath = u.path .. "?" .. url.buildQuery(u.query)
   end
 
   http:SetMethod("POST")
+  http:SetHeader("Content-Type", contentType)
+
   http:SetPostText(contentType, body)
-  http:SetHeader ("Content-Type", "text/html; charset=utf-8")
+  print(contentType)
+  print(data)
   local response = http:GetInputStream(rpath)
-  local output = response:Read(100)
-  while (not response:Eof()) do
-    output = output..response:Read(100)
+
+  local output = ""
+  if response then
+    output = response:Read(100)
+    while (not response:Eof()) do
+      output = output..response:Read(100)
+    end
+    print(output)
+  else
+    print("empty")
   end
-  return output
+
+  local statusCode = http:GetResponse()
+  print(statusCode)
+  return {
+  isOk = true,
+  status = statusCode,
+  output = wx.wxString.FromUTF8(output),
+  }
+end
+
+function postWithFilesOld(pa, body, files)
+  local openFiles = {}
+
+
+  local multipart = mp.new()
+  for k, v in pairs(body) do
+    if type(v) == "number" then
+      multipart:addField(k, ""..v)
+    else
+      multipart:addField(k, v)
+    end
+  end
+  for k, v in pairs(files) do
+    multipart:addFile(key, v, "image/jpeg", key)
+  end
+
+   
+  local data, boundary = mp.encode(body)
+  -- for i, file in ipairs(openFiles) do
+  --  file:close()
+  -- end
+
+  print("=====boundary")
+  print(multipart.boundary)
+  print("=====data")
+  print(multipart.getBody())
+  print("=====")
+  return postOld(pa, "multipart/form-data; boundary="..multipart.boundary, multipart.getBody())
 end
 
 function concat(o, delm) 
@@ -235,18 +303,19 @@ end
 -- dump(response) 
 
     
--- local response = post("http://127.0.0.1/hengwei/sessions/login", "application/json", {a="\"b"})
+-- local response = postOld("http://127.0.0.1/hengwei/sessions/login", "application/json", {a="\"b"})
 -- dump(response)
 
 
--- local response = post("http://12a7.0.0.1/hengwei/sessions/login", "application/json", "{\"a\":\"b\"}")
--- dump(response) 
+local response = postOld("http://127.0.0.1/hengwei/sessions/login", "application/json", "{\"a\":\"b\"}")
+dump(response) 
 
 
 return {
   get = get,
   post = post,
-  postWithFiles = postWithFiles,
+  postWithFiles = postWithFilesOld,
+  -- postWithFiles = postWithFiles,
   delete = delete,
   join = join,
 }

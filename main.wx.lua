@@ -172,9 +172,9 @@ function sendLoginRequest()
     local username = UI.m_username:GetValue()
     
     local localimages = imagefile
-    if  isWindow then
-      localimages = wx.wxFileName(images, imagefile):GetFullPath()
-    end
+    -- if  isWindow then
+    --  localimages = wx.wxFileName(images, imagefile):GetFullPath()
+    -- end
     
     local response = http.postWithFiles(http.join(hostAddress, "/api/link/apply"),
       {
@@ -704,7 +704,7 @@ UI.MainFrame:Connect(wx.wxEVT_TIMER, function(event)
         return
     end
     
-    local command = "ping ".. point.ip .. "-c 4"
+    local command = "ping ".. point.ip .. "  -c 4"
     if isWindow then
        command = "ping ".. point.ip
     end
@@ -747,7 +747,7 @@ UI.MainFrame:Connect(wx.wxEVT_TIMER, function(event)
         end
         logMsg("ping exit\r\n")
         
-		UI.MainFrame:ProcessEvent(wx.wxCommandEvent(wx.wxEVT_CLOSE_WINDOW, UI.MainFrame:GetId()))
+		-- UI.MainFrame:ProcessEvent(wx.wxCommandEvent(wx.wxEVT_CLOSE_WINDOW, UI.MainFrame:GetId()))
     end)
     
     pingPid = wx.wxExecute(command, wx.wxEXEC_ASYNC, pingProc)
@@ -799,14 +799,6 @@ local exited = false
 function stopScreen()
         logMsg("0\r\n")
         
-        if not exited then
-            if UI.m_check_timer:IsRunning() then
-               UI.m_check_timer:Stop()
-               counter = counter - 1
-            end
-            disconnect()
-        end
-        
         if pingPid and pingPid > 0 then
             logMsg("kill ping\r\n")
             
@@ -819,11 +811,14 @@ function stopScreen()
                                 wx.wxOK + wx.wxICON_INFORMATION)
                 end
             end
-            return
+            -- return
         end
         
         if screenPid and screenPid > 0 then
             logMsg("kill screen\r\n")
+            os.exeucte("killall ffmpeg")
+            os.exeucte("killall ffmpeg")
+            
             local killResult = wx.wxKill(screenPid, wx.wxSIGINT)
             if killResult ~= wx.wxKILL_OK and killResult ~= wx.wxKILL_NO_PROCESS then
                 killResult = wx.wxKill(screenPid, wx.wxSIGKILL)
@@ -833,7 +828,15 @@ function stopScreen()
                                 wx.wxOK + wx.wxICON_INFORMATION)
                 end
             end
-            return
+            -- return
+        end
+
+        if not exited then
+            if UI.m_check_timer:IsRunning() then
+               UI.m_check_timer:Stop()
+               counter = counter - 1
+            end
+            disconnect()
         end
         
         logMsg("1")
