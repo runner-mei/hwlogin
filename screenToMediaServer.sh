@@ -6,5 +6,5 @@ if [ -z $root_dir ]; then
 fi
 export LD_LIBRARY_PATH=$root_dir/ffmpeg/lib/
 mkdir -p $root_dir/images/
-$root_dir/ffmpeg/bin/ffmpeg -f x11grab -framerate 25 -video_size 800*600 -i :0.0 -vcodec libx264 -f flv  $1
-$root_dir/ffmpeg/bin/ffmpeg -f x11grab -framerate 25 -video_size 1024x768 -i :0.0 -vcodec libx264 -f flv  $1
+# $root_dir/ffmpeg/bin/ffmpeg -f x11grab -framerate 25 -video_size 800*600 -i :0.0 -vcodec libx264 -f flv  $1
+$root_dir/ffmpeg/bin/ffmpeg -f x11grab -framerate 25 -i :0.0 -vcodec libx264 -f flv  $1
