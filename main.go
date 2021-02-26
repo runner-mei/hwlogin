@@ -106,9 +106,20 @@ func main() {
 	})
 
 	statusBar := makeStatusBar(w)
-	nodeTab, setServerInfo := makeNodeTab(w, &serverInstance)
-	entryTab := makeEntryTab(w, &serverInstance)
-	split := container.NewHSplit(entryTab, nodeTab)
+	nodeTab, setServerInfo := makeFormTab(w, &serverInstance)
+	userimageTab := makeUserImageTab(w, &serverInstance)
+	split := container.NewHSplit(userimageTab, container.NewPadded(nodeTab))
+	split.Offset = 0.65
+	w.SetContent(container.NewBorder(nil, statusBar, nil, nil, split))
+	w.Resize(fyne.NewSize(640, 460))
+
+	summaryTitle := makeSummary(w, &serverInstance)
+	nodeTable := makeConnectionInfo(w, &serverInstance)
+	summary := container.NewGridWithColumns(1,
+		container.NewCenter(summaryTitle),
+		container.NewMax(nodeTable))
+
+	split = container.NewHSplit(userimageTab, container.NewPadded(summary))
 	split.Offset = 0.65
 	w.SetContent(container.NewBorder(nil, statusBar, nil, nil, split))
 	w.Resize(fyne.NewSize(640, 460))
@@ -121,6 +132,8 @@ func main() {
 		serverInstance.address = address
 		serverInstance.serverInfo = data
 		setServerInfo(data)
+
+		nodeTable.Refresh()
 		return nil
 	})
 	w.ShowAndRun()
@@ -182,13 +195,7 @@ func makeStatusBar(_ fyne.Window) fyne.CanvasObject {
 	)
 }
 
-func makeEntryTab(_ fyne.Window, serverInstance *ServerInstance) fyne.CanvasObject {
-	entry := widget.NewEntry()
-	entry.SetPlaceHolder("请输入用户名")
-
-	serverInstance.GetUsername = func() string {
-		return entry.Text
-	}
+func makeUserImageTab(_ fyne.Window, serverInstance *ServerInstance) fyne.CanvasObject {
 
 	//content := canvas.NewImageFromResource(theme.FyneLogo())
 	content := canvas.NewImageFromResource(resourceNoneJpg)
@@ -203,11 +210,10 @@ func makeEntryTab(_ fyne.Window, serverInstance *ServerInstance) fyne.CanvasObje
 		return content.Image
 	}
 
-	return container.NewBorder(entry, nil, nil, nil, content)
+	return container.NewMax(container.NewPadded(content))
 }
 
 func makeListTab(_ fyne.Window, serverInstance *ServerInstance) (fyne.CanvasObject, func(*ServerInfo)) {
-
 	setErrorText := serverInstance.SetMessageText
 	var srvInfo = &ServerInfo{}
 
@@ -279,7 +285,7 @@ func makeListTab(_ fyne.Window, serverInstance *ServerInstance) (fyne.CanvasObje
 	}
 }
 
-func makeNodeTab(_ fyne.Window, serverInstance *ServerInstance) (fyne.CanvasObject, func(*ServerInfo)) {
+func makeFormTab(_ fyne.Window, serverInstance *ServerInstance) (fyne.CanvasObject, func(*ServerInfo)) {
 	title := canvas.NewText("错误显示在这里", theme.ErrorColor())
 	title.Alignment = fyne.TextAlignTrailing
 
@@ -297,8 +303,110 @@ func makeNodeTab(_ fyne.Window, serverInstance *ServerInstance) (fyne.CanvasObje
 		title.Refresh()
 	}
 
+	entry := widget.NewEntry()
+	entry.SetPlaceHolder("请输入用户名")
+
+	serverInstance.GetUsername = func() string {
+		return entry.Text
+	}
+
 	content, set := makeListTab(nil, serverInstance)
-	return container.NewBorder(title, nil, nil, nil, content), set
+	return container.NewBorder(container.NewVBox(title, entry), nil, nil, nil, content), set
+}
+
+func makeSummary(_ fyne.Window, serverInstance *ServerInstance) fyne.CanvasObject {
+	nameTitle := widget.NewLabel("节点1")
+	subTitle := widget.NewLabel("正在录屏中")
+	timeText := widget.NewLabel("已接入时间：")
+	return container.NewVBox(container.NewCenter(nameTitle),
+		container.NewCenter(subTitle),
+		container.NewCenter(timeText))
+}
+
+// func makeNodeTable(_ fyne.Window, serverInstance *ServerInstance) fyne.CanvasObject {
+// 	empty := widget.NewLabel("test")
+// 	table := widget.NewTable(
+// 		func() (int, int) {
+// 			if serverInstance.serverInfo == nil {
+// 				return 1, 4
+// 			}
+// 			return len(serverInstance.serverInfo.Nodes) + 1, 4
+// 		},
+// 		func() fyne.CanvasObject {
+// 			return container.NewCenter(empty)
+// 		},
+// 		func(id widget.TableCellID, c fyne.CanvasObject) {
+// 			cell := c.(*fyne.Container)
+// 			for _, obj := range cell.Objects {
+// 				cell.Remove(obj)
+// 			}
+
+// 			if id.Row <= 0 {
+// 				switch id.Col {
+// 				case 0:
+// 					cell.Add(container.NewMax(widget.NewLabel("平面名称")))
+// 				case 1:
+// 					cell.Add(widget.NewLabel("IP 地址"))
+// 				case 2:
+// 					cell.Add(widget.NewLabel("状态"))
+// 				case 3:
+// 					cell.Add(widget.NewLabel("操作"))
+// 				}
+// 				return
+// 			}
+// 			node := serverInstance.serverInfo.Nodes[id.Row-1]
+// 			switch id.Col {
+// 			case 0:
+// 				cell.Add(widget.NewLabel(node.Name))
+// 			case 1:
+// 				cell.Add(widget.NewLabel(node.IP))
+// 			case 2:
+// 				cell.Add(widget.NewLabel("OK"))
+// 			case 3:
+// 				cell.Add(widget.NewLabel("操作"))
+// 			}
+// 			cell.Refresh()
+// 		})
+// 	return container.NewScroll(table)
+// }
+
+func makeConnectionInfo(_ fyne.Window, serverInstance *ServerInstance) fyne.CanvasObject {
+	list := widget.NewList(
+		func() int {
+			if serverInstance.connectionInfo != nil {
+				return len(serverInstance.connectionInfo.Nodes) + 1
+			}
+			return 1
+		},
+		func() fyne.CanvasObject {
+			objects := []fyne.CanvasObject{
+				widget.NewLabel("平面名称"),
+				widget.NewLabel("IP 地址"),
+				widget.NewLabel("状态"),
+				widget.NewLabel("操作"),
+			}
+			return container.NewGridWithColumns(len(objects), objects...)
+		},
+		func(id widget.ListItemID, item fyne.CanvasObject) {
+			cell := item.(*fyne.Container)
+			if id <= 0 {
+				return
+			}
+
+			node := serverInstance.connectionInfo.Nodes[id-1]
+			objects := []fyne.CanvasObject{
+				widget.NewLabel(node.Name),
+				widget.NewLabel(node.IP),
+				widget.NewLabel("OK"),
+				widget.NewLabel("操作"),
+			}
+
+			cell.Objects = objects
+			cell.Refresh()
+		},
+	)
+
+	return list
 }
 
 type NodeInfo struct {
@@ -312,6 +420,17 @@ type ServerInfo struct {
 	RequestTimeout      int        `json:"request_timeout"`
 	MediaServerURL      string     `json:"media_server"`
 	Nodes               []NodeInfo `json:"list"`
+}
+
+type PlatformInfo struct {
+	Name   string `json:"name"`
+	IP     string `json:"ip"`
+	Status string `json:"“status”"`
+}
+
+type ConnectionInfo struct {
+	AccessPointName string         `json:"accessPointName"`
+	Nodes           []PlatformInfo `json:"list"`
 }
 
 func Join(base string, paths ...string) string {
@@ -410,13 +529,14 @@ type ServerInstance struct {
 	GetUsername    func() string
 	OnDisconnected func()
 
-	mu          sync.Mutex
-	state       connState
-	kill        func()
-	stopWait    *sync.WaitGroup
-	connectID   string
-	connectAt   time.Time
-	stateChange func(connState, string)
+	mu             sync.Mutex
+	state          connState
+	kill           func()
+	stopWait       *sync.WaitGroup
+	connectID      string
+	connectAt      time.Time
+	connectionInfo *ConnectionInfo
+	stateChange    func(connState, string)
 
 	c chan func()
 }
@@ -523,7 +643,7 @@ func (si *ServerInstance) startCaptureCam() {
 					break
 				}
 
-				log.Println(err, si.status())
+				log.Println("captureCam", err, si.status())
 				// si.SetMessageText(theme.ErrorColor(), err.Error())
 				time.Sleep(1 * time.Second)
 			} else {
@@ -640,7 +760,7 @@ func (si *ServerInstance) startCaptureScreen() {
 			si.mu.Lock()
 			defer si.mu.Unlock()
 
-			log.Println(err, si.status())
+			log.Println("captureScreen", err, si.status())
 			si.SetMessageText(theme.ErrorColor(), "屏幕捕获失败，断开连接")
 			si.onDisconnected(theme.ErrorColor(), "屏幕捕获失败，断开连接")
 
@@ -784,8 +904,8 @@ func (si *ServerInstance) TestConectOk() {
 	case "pending":
 		if time.Now().Sub(si.connectAt) > (time.Duration(si.serverInfo.RequestTimeout) * time.Second) {
 			si.setStatus(unconnected)
-			si.stateChange(unconnected, "超时")
-			si.startCaptureScreen()
+			si.stateChange(unconnected, res.Msg)
+			si.stateChange = nil
 		}
 	}
 }
@@ -807,10 +927,7 @@ func (si *ServerInstance) getConnectStatus() (bool, error) {
 		return false, nil
 	}
 
-	var state struct {
-		Msg    string `json:"msg"`
-		Status string `json:"status"`
-	}
+	var state ConnectionInfo
 
 	if res != nil && res.Body != nil {
 		defer func() {
@@ -823,14 +940,10 @@ func (si *ServerInstance) getConnectStatus() (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	if state.Status == "ok" || state.Status == "on" {
-		return true, nil
-	}
-
-	if state.Msg != "" {
-		state.Msg = "服务器断开"
-	}
-	return false, errors.New(state.Msg)
+	si.mu.Lock()
+	defer si.mu.Unlock()
+	si.connectionInfo = &state
+	return true, nil
 }
 
 func (si *ServerInstance) status() connState {
