@@ -74,7 +74,7 @@ func main2() {
 				} else if strings.HasSuffix(id, "/switch") {
 					id = strings.TrimSuffix(r.URL.Path, "/switch")
 
-					err := r.ParseMultipartForm(1 * 1024 * 1024)
+					err := r.ParseForm()
 					if err != nil {
 						http.Error(w, err.Error(), http.StatusBadRequest)
 						return

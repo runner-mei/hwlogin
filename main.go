@@ -16,6 +16,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	_ "net/http/pprof"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -29,6 +30,7 @@ import (
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/data/binding"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
@@ -106,23 +108,30 @@ func main() {
 	})
 
 	statusBar := makeStatusBar(w)
-	nodeTab, setServerInfo := makeFormTab(w, &serverInstance)
+	nodeTab := makeFormTab(w, &serverInstance)
 	userimageTab := makeUserImageTab(w, &serverInstance)
 	split := container.NewHSplit(userimageTab, container.NewPadded(nodeTab))
 	split.Offset = 0.65
 	w.SetContent(container.NewBorder(nil, statusBar, nil, nil, split))
 	w.Resize(fyne.NewSize(640, 460))
 
-	summaryTitle := makeSummary(w, &serverInstance)
-	nodeTable := makeConnectionInfo(w, &serverInstance)
-	summary := container.NewGridWithColumns(1,
-		container.NewCenter(summaryTitle),
-		container.NewMax(nodeTable))
+	serverInstance.OnConnected = func() {
+		summaryTitle, refreshSummary := makeSummary(w, &serverInstance)
+		nodeTable := makeConnectionInfo(w, &serverInstance)
+		summary := container.NewGridWithColumns(1,
+			container.NewCenter(summaryTitle),
+			container.NewMax(nodeTable))
 
-	split = container.NewHSplit(userimageTab, container.NewPadded(summary))
-	split.Offset = 0.65
-	w.SetContent(container.NewBorder(nil, statusBar, nil, nil, split))
-	w.Resize(fyne.NewSize(640, 460))
+		split = container.NewHSplit(userimageTab, container.NewPadded(summary))
+		split.Offset = 0.65
+		w.SetContent(container.NewBorder(nil, statusBar, nil, nil, split))
+		w.Resize(fyne.NewSize(640, 460))
+
+		serverInstance.RefreshConnectionInfo = func() {
+			nodeTable.Refresh()
+			refreshSummary()
+		}
+	}
 
 	showConnectSettings(w, func(address string) error {
 		data, err := readServerInfo(Join(address, "/api/accessPointList"))
@@ -131,9 +140,7 @@ func main() {
 		}
 		serverInstance.address = address
 		serverInstance.serverInfo = data
-		setServerInfo(data)
-
-		nodeTable.Refresh()
+		serverInstance.setServerInfo(data)
 		return nil
 	})
 	w.ShowAndRun()
@@ -213,9 +220,8 @@ func makeUserImageTab(_ fyne.Window, serverInstance *ServerInstance) fyne.Canvas
 	return container.NewMax(container.NewPadded(content))
 }
 
-func makeListTab(_ fyne.Window, serverInstance *ServerInstance) (fyne.CanvasObject, func(*ServerInfo)) {
+func makeListTab(_ fyne.Window, serverInstance *ServerInstance) fyne.CanvasObject {
 	setErrorText := serverInstance.SetMessageText
-	var srvInfo = &ServerInfo{}
 
 	// icon := widget.NewIcon(nil)
 	// label := widget.NewLabel("Select An Item From The List")
@@ -234,7 +240,13 @@ func makeListTab(_ fyne.Window, serverInstance *ServerInstance) (fyne.CanvasObje
 
 	list := widget.NewList(
 		func() int {
-			return len(srvInfo.Nodes)
+			serverInstance.mu.Lock()
+			defer serverInstance.mu.Unlock()
+
+			if serverInstance.serverInfo == nil {
+				return 0
+			}
+			return len(serverInstance.serverInfo.Nodes)
 		},
 		func() fyne.CanvasObject {
 			return container.NewBorder(nil, nil, container.NewHBox(
@@ -244,7 +256,7 @@ func makeListTab(_ fyne.Window, serverInstance *ServerInstance) (fyne.CanvasObje
 		},
 		func(id widget.ListItemID, item fyne.CanvasObject) {
 			items := item.(*fyne.Container).Objects[0].(*fyne.Container)
-			items.Objects[1].(*widget.Label).SetText(srvInfo.Nodes[id].Name)
+			items.Objects[1].(*widget.Label).SetText(serverInstance.serverInfo.Nodes[id].Name)
 			button := item.(*fyne.Container).Objects[1].(*widget.Button)
 			button.OnTapped = func() {
 				for _, btn := range buttons {
@@ -256,7 +268,7 @@ func makeListTab(_ fyne.Window, serverInstance *ServerInstance) (fyne.CanvasObje
 				if serverInstance.IsUnconnect() {
 					setErrorText(theme.ErrorColor(), "申请中...")
 					button.SetText("取消")
-					serverInstance.Connect(srvInfo, &srvInfo.Nodes[id], func(state connState, msg string) {
+					serverInstance.Connect(&serverInstance.serverInfo.Nodes[id], func(state connState, msg string) {
 						switch state {
 						case unconnected:
 							setErrorText(theme.ErrorColor(), msg)
@@ -279,14 +291,18 @@ func makeListTab(_ fyne.Window, serverInstance *ServerInstance) (fyne.CanvasObje
 		},
 	)
 
-	return list, func(data *ServerInfo) {
-		srvInfo = data
+	serverInstance.setServerInfo = func(data *ServerInfo) {
+		serverInstance.mu.Lock()
+		serverInstance.serverInfo = data
+		serverInstance.mu.Unlock()
 		list.Refresh()
 	}
+
+	return list
 }
 
-func makeFormTab(_ fyne.Window, serverInstance *ServerInstance) (fyne.CanvasObject, func(*ServerInfo)) {
-	title := canvas.NewText("错误显示在这里", theme.ErrorColor())
+func makeFormTab(_ fyne.Window, serverInstance *ServerInstance) fyne.CanvasObject {
+	title := canvas.NewText("", theme.ErrorColor())
 	title.Alignment = fyne.TextAlignTrailing
 
 	serverInstance.SetMessageText = func(textcolor color.Color, s string) {
@@ -310,69 +326,54 @@ func makeFormTab(_ fyne.Window, serverInstance *ServerInstance) (fyne.CanvasObje
 		return entry.Text
 	}
 
-	content, set := makeListTab(nil, serverInstance)
-	return container.NewBorder(container.NewVBox(title, entry), nil, nil, nil, content), set
+	content := makeListTab(nil, serverInstance)
+	return container.NewBorder(container.NewVBox(title, entry), nil, nil, nil, content)
 }
 
-func makeSummary(_ fyne.Window, serverInstance *ServerInstance) fyne.CanvasObject {
-	nameTitle := widget.NewLabel("节点1")
-	subTitle := widget.NewLabel("正在录屏中")
-	timeText := widget.NewLabel("已接入时间：")
-	return container.NewVBox(container.NewCenter(nameTitle),
-		container.NewCenter(subTitle),
-		container.NewCenter(timeText))
+func makeSummary(_ fyne.Window, serverInstance *ServerInstance) (fyne.CanvasObject, func()) {
+	name := binding.NewString()
+	name.Set("正在获取中")
+
+	sumary := binding.NewString()
+	sumary.Set("已接入时间： 0")
+
+	title := widget.NewLabelWithData(name)
+	subTitle := canvas.NewText("正在录屏中", theme.DisabledColor())
+	timeText := widget.NewLabelWithData(sumary)
+
+	serverInstance.SetMessageText = func(c color.Color, txt string) {
+		subTitle.Color = c
+		subTitle.Text = txt
+	}
+
+	return container.NewVBox(container.NewCenter(title),
+			container.NewCenter(subTitle),
+			container.NewCenter(timeText)), func() {
+			serverInstance.mu.Lock()
+			nameStr := ""
+			sumaryStr := "已接入时间： " + time.Now().Sub(serverInstance.connectedAt).String()
+
+			if serverInstance.connectionInfo != nil {
+				for _, node := range serverInstance.connectionInfo.Nodes {
+					if node.Status == "connected" {
+						nameStr = node.Name
+						break
+					}
+				}
+			}
+			serverInstance.mu.Unlock()
+
+			name.Set(nameStr)
+			sumary.Set(sumaryStr)
+		}
 }
-
-// func makeNodeTable(_ fyne.Window, serverInstance *ServerInstance) fyne.CanvasObject {
-// 	empty := widget.NewLabel("test")
-// 	table := widget.NewTable(
-// 		func() (int, int) {
-// 			if serverInstance.serverInfo == nil {
-// 				return 1, 4
-// 			}
-// 			return len(serverInstance.serverInfo.Nodes) + 1, 4
-// 		},
-// 		func() fyne.CanvasObject {
-// 			return container.NewCenter(empty)
-// 		},
-// 		func(id widget.TableCellID, c fyne.CanvasObject) {
-// 			cell := c.(*fyne.Container)
-// 			for _, obj := range cell.Objects {
-// 				cell.Remove(obj)
-// 			}
-
-// 			if id.Row <= 0 {
-// 				switch id.Col {
-// 				case 0:
-// 					cell.Add(container.NewMax(widget.NewLabel("平面名称")))
-// 				case 1:
-// 					cell.Add(widget.NewLabel("IP 地址"))
-// 				case 2:
-// 					cell.Add(widget.NewLabel("状态"))
-// 				case 3:
-// 					cell.Add(widget.NewLabel("操作"))
-// 				}
-// 				return
-// 			}
-// 			node := serverInstance.serverInfo.Nodes[id.Row-1]
-// 			switch id.Col {
-// 			case 0:
-// 				cell.Add(widget.NewLabel(node.Name))
-// 			case 1:
-// 				cell.Add(widget.NewLabel(node.IP))
-// 			case 2:
-// 				cell.Add(widget.NewLabel("OK"))
-// 			case 3:
-// 				cell.Add(widget.NewLabel("操作"))
-// 			}
-// 			cell.Refresh()
-// 		})
-// 	return container.NewScroll(table)
-// }
 
 func makeConnectionInfo(_ fyne.Window, serverInstance *ServerInstance) fyne.CanvasObject {
 	list := widget.NewList(
 		func() int {
+			serverInstance.mu.Lock()
+			defer serverInstance.mu.Unlock()
+
 			if serverInstance.connectionInfo != nil {
 				return len(serverInstance.connectionInfo.Nodes) + 1
 			}
@@ -393,16 +394,37 @@ func makeConnectionInfo(_ fyne.Window, serverInstance *ServerInstance) fyne.Canv
 				return
 			}
 
+			serverInstance.mu.Lock()
+			defer serverInstance.mu.Unlock()
+
 			node := serverInstance.connectionInfo.Nodes[id-1]
+
+			var opWidget fyne.CanvasObject
+			status := ""
+			switch node.Status {
+			case "disconnected":
+				status = "断开"
+				opWidget = widget.NewButton("切换", func() {
+					serverInstance.Switch(&node)
+				})
+			case "connected":
+				status = "已连接"
+				opWidget = widget.NewLabel("")
+			case "fail":
+				status = "故障"
+				opWidget = widget.NewLabel("")
+			default:
+				status = node.Status
+				opWidget = widget.NewLabel("")
+			}
 			objects := []fyne.CanvasObject{
 				widget.NewLabel(node.Name),
 				widget.NewLabel(node.IP),
-				widget.NewLabel("OK"),
-				widget.NewLabel("操作"),
+				widget.NewLabel(status),
+				opWidget,
 			}
 
 			cell.Objects = objects
-			cell.Refresh()
 		},
 	)
 
@@ -519,15 +541,19 @@ func (state connState) String() string {
 }
 
 type ServerInstance struct {
-	rootDir        string
-	imageDir       string
-	address        string
-	serverInfo     *ServerInfo
-	SetMessageText func(color.Color, string)
-	SetImage       func(filename image.Image)
-	GetImage       func() image.Image
-	GetUsername    func() string
-	OnDisconnected func()
+	rootDir    string
+	imageDir   string
+	address    string
+	serverInfo *ServerInfo
+
+	RefreshConnectionInfo func()
+	setServerInfo         func(data *ServerInfo)
+	SetMessageText        func(color.Color, string)
+	SetImage              func(filename image.Image)
+	GetImage              func() image.Image
+	GetUsername           func() string
+	OnConnected           func()
+	OnDisconnected        func()
 
 	mu             sync.Mutex
 	state          connState
@@ -535,6 +561,7 @@ type ServerInstance struct {
 	stopWait       *sync.WaitGroup
 	connectID      string
 	connectAt      time.Time
+	connectedAt    time.Time
 	connectionInfo *ConnectionInfo
 	stateChange    func(connState, string)
 
@@ -780,7 +807,7 @@ func (si *ServerInstance) StopCaptureScreen() {
 
 var cachedBytes = make([]byte, 0, 1*1024*1024)
 
-func (si *ServerInstance) startConnect(srv *ServerInfo, ni *NodeInfo) error {
+func (si *ServerInstance) startConnect(ni *NodeInfo) error {
 	username := si.GetUsername()
 	if username == "" {
 		return errors.New("请输入用户名")
@@ -853,10 +880,10 @@ func (si *ServerInstance) TestConectOk() {
 		return
 	}
 
-	si.mu.Lock()
-	defer si.mu.Unlock()
-
 	if response.StatusCode != http.StatusOK {
+		si.mu.Lock()
+		defer si.mu.Unlock()
+
 		err = errResponse(response)
 		si.setStatus(unconnected)
 		si.stateChange(unconnected, err.Error())
@@ -871,6 +898,9 @@ func (si *ServerInstance) TestConectOk() {
 
 	err = json.NewDecoder(response.Body).Decode(&res)
 	if err != nil {
+		si.mu.Lock()
+		defer si.mu.Unlock()
+
 		err = errWrap(err, "申请失败")
 		si.setStatus(unconnected)
 		si.stateChange(unconnected, err.Error())
@@ -883,6 +913,9 @@ func (si *ServerInstance) TestConectOk() {
 		if res.Msg == "" {
 			res.Msg = "申请失败"
 		}
+
+		si.mu.Lock()
+		defer si.mu.Unlock()
 		si.setStatus(unconnected)
 		si.stateChange(unconnected, res.Msg)
 		si.stateChange = nil
@@ -890,6 +923,9 @@ func (si *ServerInstance) TestConectOk() {
 		if res.Msg == "" {
 			res.Msg = "申请被拒绝"
 		}
+
+		si.mu.Lock()
+		defer si.mu.Unlock()
 		si.setStatus(unconnected)
 		si.stateChange(unconnected, res.Msg)
 		si.stateChange = nil
@@ -897,12 +933,21 @@ func (si *ServerInstance) TestConectOk() {
 		if res.Msg == "" {
 			res.Msg = "申请成功"
 		}
-		si.setStatus(connected)
-		si.stateChange(connected, res.Msg)
 
-		si.startCaptureScreen()
+		func() {
+			si.mu.Lock()
+			defer si.mu.Unlock()
+
+			si.setStatus(connected)
+			si.stateChange(connected, res.Msg)
+			si.startCaptureScreen()
+		}()
+		si.OnConnected()
 	case "pending":
 		if time.Now().Sub(si.connectAt) > (time.Duration(si.serverInfo.RequestTimeout) * time.Second) {
+
+			si.mu.Lock()
+			defer si.mu.Unlock()
 			si.setStatus(unconnected)
 			si.stateChange(unconnected, res.Msg)
 			si.stateChange = nil
@@ -911,13 +956,37 @@ func (si *ServerInstance) TestConectOk() {
 }
 
 func (si *ServerInstance) TestConectionStatus() {
-	ok, _ := si.getConnectStatus()
+	ok, _ := si.GetConnectStatus()
 	if !ok {
 		si.Cancel()
 	}
 }
 
-func (si *ServerInstance) getConnectStatus() (bool, error) {
+func (si *ServerInstance) Switch(node *PlatformInfo) {
+	err := si.switchPlatform(node)
+	if err != nil {
+		msg := dialog.NewError(err, topWindow)
+		msg.Show()
+	}
+}
+
+func (si *ServerInstance) switchPlatform(node *PlatformInfo) error {
+	var data = url.Values{}
+	data.Set("name", node.Name)
+
+	response, err := http.Post(Join(si.address, "/api/link/"+si.connectID+"/switch"),
+		"application/x-www-form-urlencoded", strings.NewReader(data.Encode()))
+	if err != nil {
+		return errWrap(err, "申请失败")
+	}
+	if response.StatusCode != http.StatusOK {
+		return errResponse(response)
+	}
+
+	return nil
+}
+
+func (si *ServerInstance) GetConnectStatus() (bool, error) {
 	res, err := http.Get(Join(si.address, "/api/link/"+si.connectID+"/status"))
 	if err != nil {
 		return false, nil
@@ -941,8 +1010,11 @@ func (si *ServerInstance) getConnectStatus() (bool, error) {
 		return false, err
 	}
 	si.mu.Lock()
-	defer si.mu.Unlock()
+	si.connectedAt = time.Now()
 	si.connectionInfo = &state
+	si.mu.Unlock()
+
+	si.RefreshConnectionInfo()
 	return true, nil
 }
 
@@ -981,12 +1053,12 @@ func (si *ServerInstance) runLoop() {
 			switch si.status() {
 			case connecting:
 				si.TestConectOk()
-				// fmt.Println("1")
+				fmt.Println("1")
 			case connected:
 				si.TestConectionStatus()
-				//    fmt.Println("2")
-				// default:
-				//    fmt.Println("3")
+				fmt.Println("2")
+			default:
+				fmt.Println("3", si.status().String())
 			}
 		case <-ticker.C:
 			fis, err := ioutil.ReadDir(si.imageDir)
@@ -1041,7 +1113,7 @@ func (si *ServerInstance) runLoop() {
 func (si *ServerInstance) IsUnconnect() bool {
 	return si.status() == unconnected
 }
-func (si *ServerInstance) Connect(srv *ServerInfo, ni *NodeInfo, cb func(connState, string)) {
+func (si *ServerInstance) Connect(ni *NodeInfo, cb func(connState, string)) {
 	if atomic.CompareAndSwapInt32((*int32)(&si.state), int32(unconnected), int32(connecting)) {
 		si.StopCaptureCam()
 
@@ -1050,7 +1122,7 @@ func (si *ServerInstance) Connect(srv *ServerInfo, ni *NodeInfo, cb func(connSta
 
 		si.stateChange = cb
 
-		err := si.startConnect(srv, ni)
+		err := si.startConnect(ni)
 		if err == nil {
 			cb(connecting, "")
 		} else {
