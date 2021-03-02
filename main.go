@@ -21,6 +21,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -351,7 +352,7 @@ func makeSummary(_ fyne.Window, serverInstance *ServerInstance) (fyne.CanvasObje
 			container.NewCenter(timeText)), func() {
 			serverInstance.mu.Lock()
 			nameStr := ""
-			sumaryStr := "已接入时间： " + time.Now().Sub(serverInstance.connectedAt).String()
+			sumaryStr := "已接入时间： " + strconv.Itoa(int(time.Now().Sub(serverInstance.connectedAt).Seconds())) + "秒"
 
 			if serverInstance.connectionInfo != nil {
 				for _, node := range serverInstance.connectionInfo.Nodes {
@@ -365,6 +366,8 @@ func makeSummary(_ fyne.Window, serverInstance *ServerInstance) (fyne.CanvasObje
 
 			name.Set(nameStr)
 			sumary.Set(sumaryStr)
+
+			fmt.Println(sumaryStr)
 		}
 }
 
@@ -980,6 +983,7 @@ func (si *ServerInstance) TestConectOk() {
 			si.mu.Lock()
 			defer si.mu.Unlock()
 
+			si.connectedAt = time.Now()
 			si.setStatus(connected)
 			si.stateChange(connected, res.Msg)
 			si.startCaptureScreen()
@@ -1052,7 +1056,7 @@ func (si *ServerInstance) GetConnectStatus() (bool, error) {
 		return false, err
 	}
 	si.mu.Lock()
-	si.connectedAt = time.Now()
+	// si.connectedAt = time.Now()
 	si.connectionInfo = &state
 	si.mu.Unlock()
 
