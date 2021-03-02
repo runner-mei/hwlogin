@@ -123,7 +123,7 @@ func main() {
 			container.NewMax(nodeTable))
 
 		split = container.NewHSplit(userimageTab, container.NewPadded(summary))
-		split.Offset = 0.65
+		split.Offset = 0.25
 		w.SetContent(container.NewBorder(nil, statusBar, nil, nil, split))
 		w.Resize(fyne.NewSize(640, 460))
 
@@ -383,7 +383,8 @@ func makeConnectionInfo(_ fyne.Window, serverInstance *ServerInstance) fyne.Canv
 			objects := []fyne.CanvasObject{
 				widget.NewLabel("平面名称"),
 				widget.NewLabel("IP 地址"),
-				widget.NewLabel("状态"),
+				widget.NewLabel("接入状态"),
+				widget.NewLabel("网络状态"),
 				widget.NewLabel("操作"),
 			}
 			return container.NewGridWithColumns(len(objects), objects...)
@@ -417,10 +418,23 @@ func makeConnectionInfo(_ fyne.Window, serverInstance *ServerInstance) fyne.Canv
 				status = node.Status
 				opWidget = widget.NewLabel("")
 			}
+
+			netStatus := ""
+			switch node.NetworkStatus {
+			case "ok":
+				netStatus = "正常"
+			case "none":
+				netStatus = "禁用"
+			case "fail":
+				netStatus = "故障"
+			default:
+				netStatus = node.Status
+			}
 			objects := []fyne.CanvasObject{
 				widget.NewLabel(node.Name),
 				widget.NewLabel(node.IP),
 				widget.NewLabel(status),
+				widget.NewLabel(netStatus),
 				opWidget,
 			}
 
@@ -445,13 +459,16 @@ type ServerInfo struct {
 }
 
 type PlatformInfo struct {
-	Name   string `json:"name"`
-	IP     string `json:"ip"`
-	Status string `json:"“status”"`
+	Name          string `json:"name"`
+	IP            string `json:"ip"`
+	Status        string `json:"status"`
+	NetworkStatus string `json:"network_status"`
 }
 
 type ConnectionInfo struct {
 	AccessPointName string         `json:"accessPointName"`
+	Status          string         `json:"status,omitempty"`
+	Msg             string         `json:"msg,omitempty"`
 	Nodes           []PlatformInfo `json:"list"`
 }
 
@@ -640,6 +657,11 @@ func (si *ServerInstance) startCaptureCam() {
 	go func() {
 		defer stopWait.Done()
 
+		out, _ := os.Create(filepath.Join(si.rootDir, "toImages.log"))
+		if out != nil {
+			defer out.Close()
+		}
+
 		for si.IsUnconnect() {
 			if err := os.MkdirAll(si.imageDir, 0777); err != nil {
 				if !os.IsExist(err) {
@@ -652,6 +674,18 @@ func (si *ServerInstance) startCaptureCam() {
 			copyed.Args = cmd.Args
 			copyed.Env = cmd.Env
 			copyed.Dir = cmd.Dir
+
+			if out != nil {
+				copyed.Stdout = out
+				copyed.Stderr = out
+
+				out.WriteString(copyed.Path)
+				for _, arg := range copyed.Args {
+					out.WriteString("\n  ")
+					out.WriteString(arg)
+				}
+				out.WriteString("\n")
+			}
 
 			si.mu.Lock()
 			si.kill = func() {
@@ -706,10 +740,16 @@ func (si *ServerInstance) startCaptureScreen() {
 		return
 	}
 
+	if si.connectID == "" {
+		panic(errors.New("connectId is empty"))
+	}
+
 	var cmd *exec.Cmd
 	if isWindows {
 		filename := filepath.Join(si.rootDir, "screenToMediaServer.bat")
 		if FileExists(filename) {
+			fmt.Println(si.serverInfo.MediaServerURL + si.connectID)
+
 			cmd = exec.Command(filename, si.serverInfo.MediaServerURL+si.connectID)
 		} else {
 			cmd = exec.Command("ffmpeg", "-f", "gdigrab", "-framerate", "15", "-i", "desktop", "-vcodec", "libx264", "-f", "flv",
@@ -776,7 +816,6 @@ func (si *ServerInstance) startCaptureScreen() {
 			if copyed.Process != nil {
 				kill(copyed.Process.Pid)
 				copyed.Process.Kill()
-
 			}
 			killByName("ffmpeg")
 		}
@@ -795,8 +834,11 @@ func (si *ServerInstance) startCaptureScreen() {
 		} else {
 			si.mu.Lock()
 			defer si.mu.Unlock()
-			si.SetMessageText(theme.TextColor(), "")
-			si.onDisconnected(theme.TextColor(), "")
+
+			log.Println("captureScreen", si.status())
+
+			si.SetMessageText(theme.ErrorColor(), "屏幕捕获结束，断开连接")
+			si.onDisconnected(theme.ErrorColor(), "屏幕捕获结束，断开连接")
 		}
 	}()
 }
@@ -1028,7 +1070,7 @@ func (si *ServerInstance) setStatus(state connState) {
 
 func (si *ServerInstance) runLoop() {
 	ticker := time.NewTicker(20 * time.Millisecond)
-	pollTicker := time.NewTicker(5 * time.Second)
+	pollTicker := time.NewTicker(1 * time.Second)
 
 	fis, err := ioutil.ReadDir(si.imageDir)
 	if err == nil {
@@ -1037,6 +1079,7 @@ func (si *ServerInstance) runLoop() {
 		}
 	}
 
+	killByName("ffmpeg")
 	defer func() {
 		si.Cancel()
 

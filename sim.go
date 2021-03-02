@@ -32,7 +32,7 @@ var platform2status = "disconnected"
 func main2() {
 	log.Printf("Serving %s on HTTP port: %s\n", dir, port)
 	log.Fatal(http.ListenAndServe(":"+port, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		log.Println(r.URL.Path)
+		log.Println(r.Method, r.URL.Path)
 
 		switch r.URL.Path {
 		case "/api/accessPointList":
@@ -55,21 +55,11 @@ func main2() {
 				if strings.HasSuffix(id, "/status") {
 					id = strings.TrimSuffix(r.URL.Path, "/status")
 					w.WriteHeader(http.StatusOK)
-					io.WriteString(w, `{
-						"accessPointName": "xxxx 接入点",
-						"list": [
-								{
-									"name": "平面1",
-									"ip":  "平面1IP",
-									"status": "`+platform1status+`"
-								},
-								{
-									"name": "平面2",
-									"ip":  "平面2IP",
-									"status": "`+platform2status+`"
-								}
-							]
-						}`)
+					io.WriteString(w, `{"accessPointName":"盐城001",
+						"code":200,
+						"list":[{"ip":"127.0.0.1","name":"1平面","status":"`+platform1status+`", "network_status": "ok"},
+						{"ip":"192.168.0.108","name":"2平面","status":"`+platform2status+`", "network_status": "ok"}],
+						"msg":"网络连接正常","status":"ok"}`)
 					return
 				} else if strings.HasSuffix(id, "/switch") {
 					id = strings.TrimSuffix(r.URL.Path, "/switch")
@@ -81,7 +71,6 @@ func main2() {
 					}
 
 					name := r.FormValue("name")
-
 					switch name {
 					case "平面1":
 						platform1status = "connected"
@@ -113,7 +102,7 @@ func index(w http.ResponseWriter, r *http.Request) {
 "msg":"获得接入点列表成功",
 "request_poll_interval": 5,
 "request_timeout": 300,
-"media_server": "rtmp://127.0.0.1",
+"media_server": "rtmp://127.0.0.1/",
 "list":[
 {
 "id":"1",
