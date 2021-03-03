@@ -1,3 +1,5 @@
+// +build sim
+
 package main
 
 import (
@@ -29,7 +31,7 @@ func init() {
 var platform1status = "connected"
 var platform2status = "disconnected"
 
-func main2() {
+func main() {
 	log.Printf("Serving %s on HTTP port: %s\n", dir, port)
 	log.Fatal(http.ListenAndServe(":"+port, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		log.Println(r.Method, r.URL.Path)
