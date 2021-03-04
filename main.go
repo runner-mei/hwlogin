@@ -164,7 +164,7 @@ func main() {
 
 func showConnectSettings(win fyne.Window, cb func(string) error) {
 	//var validateErr error
-	selectEntry := widget.NewSelectEntry([]string{"http://127.0.0.1:8000"})
+	selectEntry := widget.NewSelectEntry([]string{"http://192.168.0.1:8083", "http://127.0.0.1:8000"})
 	selectEntry.PlaceHolder = "请输入或选择"
 	//selectEntry.Validator = fyne.StringValidator(func(s string) error {
 	//	return validateErr
@@ -172,7 +172,7 @@ func showConnectSettings(win fyne.Window, cb func(string) error) {
 	size := selectEntry.MinSize()
 	size.Width += 50
 	selectEntry.Resize(size)
-	selectEntry.SetText("http://127.0.0.1:8000")
+	selectEntry.SetText("http://192.168.0.1:8083")
 	selectItem := widget.NewFormItem("地址", selectEntry)
 	//selectItem.HintText = "OK"
 	items := []*widget.FormItem{
