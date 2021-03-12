@@ -51,6 +51,7 @@ const preferenceCurrentTutorial = "currentTutorial"
 
 var isWindows = runtime.GOOS == "windows"
 var topWindow fyne.Window
+var serverAddress string
 
 func shortcutFocused(s fyne.Shortcut, w fyne.Window) {
 	if focused, ok := w.Canvas().Focused().(fyne.Shortcutable); ok {
@@ -85,8 +86,10 @@ func main() {
 	}
 
 	a := app.NewWithID("cn.com.hengwei.hwlogin")
-	a.SetIcon(theme.FyneLogo())
-	w := a.NewWindow("登录小程序")
+	a.SetIcon(Logo)
+	a.Settings().SetTheme(theme.DarkTheme())
+
+	w := a.NewWindow("调控人机交互云终端-安全准入装置")
 	topWindow = w
 	w.SetMaster()
 
@@ -133,8 +136,12 @@ func main() {
 			container.NewCenter(summaryTitle),
 			container.NewMax(nodeTable))
 
-		btn := widget.NewButton("返回", func() {
-			serverInstance.Cancel()
+		btn := widget.NewButton("断开", func() {
+			dialog.NewConfirm("提示", "是否确定断开?", func(ok bool) {
+				if ok {
+					serverInstance.Cancel()
+				}
+			}, w).Show()
 		})
 		summaryContent := container.NewBorder(container.NewBorder(nil, nil, nil, btn), nil, nil, nil, summary)
 
@@ -154,6 +161,7 @@ func main() {
 		if err != nil {
 			return err
 		}
+		serverAddress = address
 		serverInstance.address = address
 		serverInstance.serverInfo = data
 		serverInstance.setServerInfo(data)
@@ -202,20 +210,73 @@ func showConnectSettings(win fyne.Window, cb func(string) error) {
 	dlg.Show()
 }
 
-func makeStatusBar(_ fyne.Window) fyne.CanvasObject {
-	a := fyne.CurrentApp()
+func makeStatusBar(w fyne.Window) fyne.CanvasObject {
+	// a := fyne.CurrentApp()
 	return container.NewHBox(
-		widget.NewButton("Dark", func() {
-			a.Settings().SetTheme(theme.DarkTheme())
-		}),
-		widget.NewButton("Light", func() {
-			a.Settings().SetTheme(theme.LightTheme())
-		}),
+		// widget.NewButton("Dark", func() {
+		// 	a.Settings().SetTheme(theme.DarkTheme())
+		// }),
+		// widget.NewButton("Light", func() {
+		// 	a.Settings().SetTheme(theme.LightTheme())
+		// }),
 		layout.NewSpacer(),
-		widget.NewButton("Settings", func() {
-			a.Settings().SetTheme(theme.LightTheme())
+		widget.NewButton("配置临时接入点", func() {
+			setTempAccessPoint(serverAddress, w, nil)
 		}),
 	)
+}
+
+func setTempAccessPoint(address string, w fyne.Window, err error) {
+	name := widget.NewEntry()
+	name1 := widget.NewEntry()
+	name2 := widget.NewEntry()
+	ip1 := widget.NewEntry()
+	ip2 := widget.NewEntry()
+	mark1 := widget.NewEntry()
+	mark2 := widget.NewEntry()
+	gateway1 := widget.NewEntry()
+	gateway2 := widget.NewEntry()
+
+	form := dialog.NewForm("配置临时接入点", "确认", "取消", []*widget.FormItem{
+		widget.NewFormItem("节点名称", name),
+		widget.NewFormItem("1平面名称", name1),
+		widget.NewFormItem("1平面IP", ip1),
+		widget.NewFormItem("1平面掩码", mark1),
+		widget.NewFormItem("1平面网关", gateway1),
+		widget.NewFormItem("2平面名称", name2),
+		widget.NewFormItem("2平面IP", ip2),
+		widget.NewFormItem("2平面掩码", mark2),
+		widget.NewFormItem("2平面网关", gateway2),
+	}, func(ok bool) {
+		if !ok {
+			return
+		}
+
+		var data = url.Values{}
+		data.Set("name", name.Text)
+		data.Set("name1", name1.Text)
+		data.Set("name2", name2.Text)
+		data.Set("ip1", ip1.Text)
+		data.Set("ip2", ip2.Text)
+		data.Set("mark1", mark1.Text)
+		data.Set("mark2", mark2.Text)
+		data.Set("gateway1", gateway1.Text)
+		data.Set("gateway2", gateway2.Text)
+
+		response, err := http.Post(Join(address, "/api/deploy/accessPoint"),
+			"application/x-www-form-urlencoded", strings.NewReader(data.Encode()))
+		if err != nil {
+			err = errWrap(err, "申请失败")
+			setTempAccessPoint(address, w, err)
+		} else if response.StatusCode != http.StatusOK {
+			err = errResponse(response)
+			setTempAccessPoint(address, w, err)
+		}
+	}, w)
+	form.Show()
+	if err != nil {
+		dialog.NewError(err, w).Show()
+	}
 }
 
 func makeUserImageTab(_ fyne.Window, serverInstance *ServerInstance) fyne.CanvasObject {
@@ -236,7 +297,7 @@ func makeUserImageTab(_ fyne.Window, serverInstance *ServerInstance) fyne.Canvas
 	return container.NewMax(container.NewPadded(content))
 }
 
-func makeListTab(_ fyne.Window, serverInstance *ServerInstance) (fyne.CanvasObject, func()) {
+func makeListTab(win fyne.Window, serverInstance *ServerInstance) (fyne.CanvasObject, func()) {
 	setErrorText := serverInstance.SetMessageText
 
 	// icon := widget.NewIcon(nil)
@@ -272,7 +333,8 @@ func makeListTab(_ fyne.Window, serverInstance *ServerInstance) (fyne.CanvasObje
 			items := item.(*fyne.Container).Objects[0].(*fyne.Container)
 			items.Objects[1].(*widget.Label).SetText(serverInstance.serverInfo.Nodes[id].Name)
 			button := item.(*fyne.Container).Objects[1].(*widget.Button)
-			button.OnTapped = func() {
+
+			tappedFunc := func() {
 				for _, btn := range buttons {
 					if btn != button {
 						btn.Disable()
@@ -302,6 +364,17 @@ func makeListTab(_ fyne.Window, serverInstance *ServerInstance) (fyne.CanvasObje
 				}
 			}
 			buttons = append(buttons, button)
+			button.OnTapped = func() {
+				if button.Text == "断开" {
+					dialog.NewConfirm("提示", "是否确定断开?", func(ok bool) {
+						if ok {
+							tappedFunc()
+						}
+					}, win).Show()
+				} else {
+					tappedFunc()
+				}
+			}
 		},
 	)
 
