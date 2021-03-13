@@ -266,16 +266,19 @@ func setTempAccessPoint(address string, w fyne.Window, err error) {
 		response, err := http.Post(Join(address, "/api/deploy/accessPoint"),
 			"application/x-www-form-urlencoded", strings.NewReader(data.Encode()))
 		if err != nil {
-			err = errWrap(err, "申请失败")
+			err = errWrap(err, "创建临时接入点失败")
 			setTempAccessPoint(address, w, err)
 		} else if response.StatusCode != http.StatusOK {
 			err = errResponse(response)
 			setTempAccessPoint(address, w, err)
+		} else {
+			dialog.ShowInformation("提示", "创建临时接入点成功", w)
 		}
 	}, w)
+	form.Resize(fyne.NewSize(500, 460))
 	form.Show()
 	if err != nil {
-		dialog.NewError(err, w).Show()
+		dialog.ShowError(err, w)
 	}
 }
 
