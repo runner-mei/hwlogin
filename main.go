@@ -221,12 +221,12 @@ func makeStatusBar(w fyne.Window) fyne.CanvasObject {
 		// }),
 		layout.NewSpacer(),
 		widget.NewButton("配置临时接入点", func() {
-			setTempAccessPoint(serverAddress, w, nil)
+			setTempAccessPoint(serverAddress, w, nil, nil)
 		}),
 	)
 }
 
-func setTempAccessPoint(address string, w fyne.Window, err error) {
+func setTempAccessPoint(address string, w fyne.Window, data url.Values, err error) {
 	name := widget.NewEntry()
 	name1 := widget.NewEntry()
 	name2 := widget.NewEntry()
@@ -236,6 +236,18 @@ func setTempAccessPoint(address string, w fyne.Window, err error) {
 	mark2 := widget.NewEntry()
 	gateway1 := widget.NewEntry()
 	gateway2 := widget.NewEntry()
+
+	if data != nil {
+		name.Text = data.Get("name")
+		name1.Text = data.Get("name1")
+		name2.Text = data.Get("name2")
+		ip1.Text = data.Get("ip1")
+		ip2.Text = data.Get("ip2")
+		mark1.Text = data.Get("mark1")
+		mark2.Text = data.Get("mark2")
+		gateway1.Text = data.Get("gateway1")
+		gateway2.Text = data.Get("gateway2")
+	}
 
 	form := dialog.NewForm("配置临时接入点", "确认", "取消", []*widget.FormItem{
 		widget.NewFormItem("节点名称", name),
@@ -267,10 +279,12 @@ func setTempAccessPoint(address string, w fyne.Window, err error) {
 			"application/x-www-form-urlencoded", strings.NewReader(data.Encode()))
 		if err != nil {
 			err = errWrap(err, "创建临时接入点失败")
-			setTempAccessPoint(address, w, err)
+			setTempAccessPoint(address, w, data, err)
 		} else if response.StatusCode != http.StatusOK {
 			err = errResponse(response)
-			setTempAccessPoint(address, w, err)
+			setTempAccessPoint(address, w, data, err)
+		} else if err = toError(response); err != nil {
+			setTempAccessPoint(address, w, data, err)
 		} else {
 			dialog.ShowInformation("提示", "创建临时接入点成功", w)
 		}
@@ -620,6 +634,32 @@ func errResponse(response *http.Response) error {
 
 	if err := json.Unmarshal(bs, &res); err == nil && res.Msg != "" {
 		return errors.New(res.Msg)
+	}
+
+	return errors.New(string(bs))
+}
+
+func toError(response *http.Response) error {
+	bs, err := ioutil.ReadAll(response.Body)
+	if err != nil || len(bs) == 0 {
+		if err != nil {
+			return errors.New(response.Status + ":" + err.Error())
+		} else {
+			return errors.New(response.Status + ": read body failed")
+		}
+	}
+	var res struct {
+		Code int    `json:"code,omitempty"`
+		Msg  string `json:"msg,omitempty"`
+	}
+
+	if err := json.Unmarshal(bs, &res); err == nil {
+		if res.Code == 0 || res.Code == http.StatusOK {
+			return nil
+		}
+		if res.Msg != "" {
+			return errors.New(res.Msg)
+		}
 	}
 
 	return errors.New(string(bs))

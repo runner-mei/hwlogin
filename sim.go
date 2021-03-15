@@ -50,6 +50,8 @@ func main() {
 				http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 			}
 
+		case "/api/deploy/accessPoint":
+			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		default:
 			if strings.HasPrefix(r.URL.Path, "/api/link/") {
 				id := strings.TrimPrefix(r.URL.Path, "/api/link/")
